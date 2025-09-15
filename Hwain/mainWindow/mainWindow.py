@@ -47,411 +47,194 @@ class PageWindow(QMainWindow):
     def goto(self, name):
         self.gotoSignal.emit(name)
 
-class GraphViewer_Thread(QThread):
-    def __init__(self, mainwindow, datahub, update_ms=50, tail_len=500):
-        super().__init__()
-        self.mainwindow = mainwindow
-        self.datahub = datahub
+# class GraphViewer_Thread(QThread):
+#     def __init__(self, mainwindow, datahub, update_ms=50, tail_len=500):
+#         super().__init__()
+#         self.mainwindow = mainwindow
+#         self.datahub = datahub
 
-        # ---- 위젯/레이아웃(네 기존 ws.* 사용 유지) ----
-        self.view = QWebEngineView(self.mainwindow.container)
-        self.view.load(QUrl())
-        self.view.setGeometry(*ws.webEngine_geometry)
+#         # ---- 위젯/레이아웃(네 기존 ws.* 사용 유지) ----
+#         self.view = QWebEngineView(self.mainwindow.container)
+#         self.view.load(QUrl())
+#         self.view.setGeometry(*ws.webEngine_geometry)
         
-        self.angleSpeed_title = QLabel(self.mainwindow.container)
-        self.angleSpeed_title.setText("<b>&#8226; Angle Speed</b>")
-        self.angleSpeed_title.setStyleSheet("color: white;")
-        self.pw_angleSpeed = PlotWidget(self.mainwindow.container)
+#         self.angleSpeed_title = QLabel(self.mainwindow.container)
+#         self.angleSpeed_title.setText("<b>&#8226; Angle Speed</b>")
+#         self.angleSpeed_title.setStyleSheet("color: white;")
+#         self.pw_angleSpeed = PlotWidget(self.mainwindow.container)
         
-        self.accel_title = QLabel(self.mainwindow.container)
-        self.accel_title.setText("<b>&#8226; Acceleration</b>")
-        self.accel_title.setStyleSheet("color: white;")
-        self.pw_accel = PlotWidget(self.mainwindow.container)
+#         self.accel_title = QLabel(self.mainwindow.container)
+#         self.accel_title.setText("<b>&#8226; Acceleration</b>")
+#         self.accel_title.setStyleSheet("color: white;")
+#         self.pw_accel = PlotWidget(self.mainwindow.container)
         
-        self.speed_title = QLabel(self.mainwindow.container)
-        self.speed_title.setText("<b>&#8226; Speed (ENU)</b>")
-        self.speed_title.setStyleSheet("color: white;")
-        self.pw_speed = PlotWidget(self.mainwindow.container)
+#         self.speed_title = QLabel(self.mainwindow.container)
+#         self.speed_title.setText("<b>&#8226; Speed (ENU)</b>")
+#         self.speed_title.setStyleSheet("color: white;")
+#         self.pw_speed = PlotWidget(self.mainwindow.container)
         
-        self.pw_angleSpeed.setGeometry(*ws.pw_angleSpeed_geometry)
-        self.pw_accel.setGeometry(*ws.pw_accel_geometry)
-        self.pw_speed.setGeometry(*ws.pw_speed_geometry)
+#         self.pw_angleSpeed.setGeometry(*ws.pw_angleSpeed_geometry)
+#         self.pw_accel.setGeometry(*ws.pw_accel_geometry)
+#         self.pw_speed.setGeometry(*ws.pw_speed_geometry)
           
-        self.angleSpeed_title.setGeometry(*ws.angleSpeed_title_geometry)
-        self.accel_title.setGeometry(*ws.accel_title_geometry)
-        self.speed_title.setGeometry(*ws.speed_title_geometry)
-
-        self.angleSpeed_title.setFont(ws.font_angleSpeed_title)
-        self.accel_title.setFont(ws.font_accel_title)
-        self.speed_title.setFont(ws.font_speed_title)
-
-        # grids
-        self.pw_angleSpeed.addItem(GridItem())
-        self.pw_accel.addItem(GridItem())
-        self.pw_speed.addItem(GridItem())
-
-        # axis labels
-        self.pw_angleSpeed.getPlotItem().getAxis('bottom').setLabel('Time (s)')
-        self.pw_angleSpeed.getPlotItem().getAxis('left').setLabel('deg/s')
-        self.pw_accel.getPlotItem().getAxis('bottom').setLabel('Time (s)')
-        self.pw_accel.getPlotItem().getAxis('left').setLabel('g')
-        self.pw_speed.getPlotItem().getAxis('bottom').setLabel('Time (s)')
-        self.pw_speed.getPlotItem().getAxis('left').setLabel('m/s')
-
-        # ranges
-        self.pw_angleSpeed.setYRange(-1000, 1000)
-        self.pw_accel.setYRange(-20, 20)
-        self.pw_speed.setYRange(-100, 1000)
-
-        # legends
-        self.pw_angleSpeed.getPlotItem().addLegend()
-        self.pw_accel.getPlotItem().addLegend()
-        self.pw_speed.getPlotItem().addLegend()
-
-        # curves
-        self.curve_rollSpeed  = self.pw_angleSpeed.plot(pen='r', name="roll speed")
-        self.curve_pitchSpeed = self.pw_angleSpeed.plot(pen='g', name="pitch speed")
-        self.curve_yawSpeed   = self.pw_angleSpeed.plot(pen='b', name="yaw speed")
-
-        self.curve_xaccel = self.pw_accel.plot(pen='r', name="x acc")
-        self.curve_yaccel = self.pw_accel.plot(pen='g', name="y acc")
-        self.curve_zaccel = self.pw_accel.plot(pen='b', name="z acc")
-
-        self.curve_e_speed = self.pw_speed.plot(pen='r', name='E speed (ENU)')
-        self.curve_n_speed = self.pw_speed.plot(pen='g', name='N speed (ENU)')
-        self.curve_u_speed = self.pw_speed.plot(pen='b', name='U speed (ENU)')
-
-        # buffers
-        self.tail_len = int(tail_len)
-        self.time       = np.zeros(self.tail_len)
-        self.rollSpeed  = np.zeros(self.tail_len)
-        self.pitchSpeed = np.zeros(self.tail_len)
-        self.yawSpeed   = np.zeros(self.tail_len)
-        self.xaccel     = np.zeros(self.tail_len)
-        self.yaccel     = np.zeros(self.tail_len)
-        self.zaccel     = np.zeros(self.tail_len)
-        self.espeed     = np.zeros(self.tail_len)
-        self.nspeed     = np.zeros(self.tail_len)
-        self.uspeed     = np.zeros(self.tail_len)
-
-        # timer (UI 스레드에서 갱신)
-        self.timer = QTimer(self.mainwindow)
-        self.timer.timeout.connect(self.update_data)
-        self.timer.start(int(update_ms))
-
-    @pyqtSlot()
-    def update_data(self):
-        # Datahub에서 스냅샷 추출(락으로 보호)
-        with self.datahub.lock:
-            n = len(self.datahub.vE_enu)
-            if n == 0:
-                return
-
-            # 필요한 배열들만 복사
-            t           = self.datahub.t.copy()
-            rollSpeeds  = self.datahub.rollSpeeds.copy()
-            pitchSpeeds = self.datahub.pitchSpeeds.copy()
-            yawSpeeds   = self.datahub.yawSpeeds.copy()
-
-            Xaccels = self.datahub.Xaccels.copy()
-            Yaccels = self.datahub.Yaccels.copy()
-            Zaccels = self.datahub.Zaccels.copy()
-
-            vE = self.datahub.vE_enu.copy()
-            vN = self.datahub.vN_enu.copy()
-            vU = self.datahub.vU_enu.copy()
-
-            hrs  = self.datahub.hours.copy()
-            mins = self.datahub.mins.copy()
-            secs = self.datahub.secs.copy()
-            tenm = self.datahub.tenmilis.copy()
-
-        L = self.tail_len
-        # 뷰 버퍼 초기화
-        self.time.fill(0.0); self.rollSpeed.fill(0.0); self.pitchSpeed.fill(0.0); self.yawSpeed.fill(0.0)
-        self.xaccel.fill(0.0); self.yaccel.fill(0.0); self.zaccel.fill(0.0)
-        self.espeed.fill(0.0); self.nspeed.fill(0.0); self.uspeed.fill(0.0)
-
-        if n <= L:
-            k = n
-            self.rollSpeed[-k:]  = rollSpeeds[-k:]
-            self.pitchSpeed[-k:] = pitchSpeeds[-k:]
-            self.yawSpeed[-k:]   = yawSpeeds[-k:]
-
-            self.xaccel[-k:] = Xaccels[-k:]
-            self.yaccel[-k:] = Yaccels[-k:]
-            self.zaccel[-k:] = Zaccels[-k:]
-
-            self.espeed[-k:] = vE[-k:]
-            self.nspeed[-k:] = vN[-k:]
-            self.uspeed[-k:] = vU[-k:]
-
-            # 시간: 누적초 t가 있으면 tail 기준 0으로 정규화
-            if len(t) >= k:
-                tt = t[-k:]
-                self.time[-k:] = tt - tt[0]
-            else:
-                t_abs = hrs[-k:]*3600.0 + mins[-k:]*60.0 + secs[-k:] + tenm[-k:]/100.0
-                self.time[-k:] = t_abs - t_abs[0]
-        else:
-            s = -L
-            self.rollSpeed[:]  = rollSpeeds[s:]
-            self.pitchSpeed[:] = pitchSpeeds[s:]
-            self.yawSpeed[:]   = yawSpeeds[s:]
-
-            self.xaccel[:] = Xaccels[s:]
-            self.yaccel[:] = Yaccels[s:]
-            self.zaccel[:] = Zaccels[s:]
-
-            self.espeed[:] = vE[s:]
-            self.nspeed[:] = vN[s:]
-            self.uspeed[:] = vU[s:]
-
-            if len(t) >= L:
-                tt = t[s:]
-                self.time[:] = tt - tt[0]
-            else:
-                t_abs = hrs[s:]*3600.0 + mins[s:]*60.0 + secs[s:] + tenm[s:]/100.0
-                self.time[:] = t_abs - t_abs[0]
-
-        # 그리기
-        self.curve_rollSpeed.setData(x=self.time, y=self.rollSpeed)
-        self.curve_pitchSpeed.setData(x=self.time, y=self.pitchSpeed)
-        self.curve_yawSpeed.setData(x=self.time, y=self.yawSpeed)
-
-        self.curve_xaccel.setData(x=self.time, y=self.xaccel)
-        self.curve_yaccel.setData(x=self.time, y=self.yaccel)
-        self.curve_zaccel.setData(x=self.time, y=self.zaccel)
-
-        self.curve_e_speed.setData(x=self.time, y=self.espeed)
-        self.curve_n_speed.setData(x=self.time, y=self.nspeed)
-        self.curve_u_speed.setData(x=self.time, y=self.uspeed)
-
-    def graph_clear(self):
-        for arr in (self.time, self.rollSpeed, self.pitchSpeed, self.yawSpeed,
-                    self.xaccel, self.yaccel, self.zaccel, self.espeed, self.nspeed, self.uspeed):
-            arr.fill(0.0)
-
-        self.curve_rollSpeed.clear(); self.curve_pitchSpeed.clear(); self.curve_yawSpeed.clear()
-        self.curve_xaccel.clear();    self.curve_yaccel.clear();    self.curve_zaccel.clear()
-        self.curve_e_speed.clear();   self.curve_n_speed.clear();   self.curve_u_speed.clear()
-
-class RealTimeENUPlot(QThread):
-    def __init__(self, mainwindow, datahub,
-                 tail_len: int = 2000,
-                 update_ms: int = 50,
-                 vel_scale: float = 0.2):
-        super().__init__()
-
-        self.QVector3D = QVector3D
-        self.mainwindow = mainwindow
-        self.datahub = datahub
-        self.tail_len = int(tail_len)
-        self.update_ms = int(update_ms)
-        self.vel_scale = float(vel_scale)
-
-        # 내부 버퍼 (ENU만)
-        from collections import deque
-        self.E_hist = deque(maxlen=self.tail_len)
-        self.N_hist = deque(maxlen=self.tail_len)
-        self.U_hist = deque(maxlen=self.tail_len)
-        self._last_count = 0
-
-        # 뷰/아이템
-        self.trajectory_title = QLabel(self.mainwindow.container)
-        self.trajectory_title.setText("<b>&#8226; Trajectory (ENU)</b>")
-        self.trajectory_title.setStyleSheet("color: white;")
-        self.trajectory_title.setFont(ws.font_trajectory_title)
-        self.trajectory_title.setGeometry(*ws.trajectory_title_geometry)
-
-        self.view = gl.GLViewWidget(self.mainwindow.container)
-        self.view.setGeometry(*ws.pw_trajectory_geometry)
-        self.view.setWindowTitle("Trajectory")
-        self.view.setCameraPosition(distance=50)
-
-        self._add_axes()
-        self.traj_item = gl.GLLinePlotItem(pos=np.zeros((2, 3)), width=2, antialias=True)
-        self.view.addItem(self.traj_item)
-        self.head_item = gl.GLScatterPlotItem(pos=np.array([[0, 0, 0]]), size=8)
-        self.view.addItem(self.head_item)
-        self.vel_item = gl.GLLinePlotItem(pos=np.zeros((2, 3)), width=3, antialias=True)
-        self.view.addItem(self.vel_item)
-
-        self._add_legend()
-
-        # 갱신 타이머
-        self.timer = QTimer(self.mainwindow)
-        self.timer.timeout.connect(self._update_plot)
-        self.timer.start(self.update_ms)
-
-        # 옵션
-        self.keep_all = True
-        self.max_draw_pts = 20000
-
-        self.E_all, self.N_all, self.U_all = [], [], []
-
-    # ---------------- ENU 전용 스냅샷/그리기 ---------------- #
-
-    def _available_count(self) -> int:
-        # ENU가 하나도 없으면 0
-        return min(len(self.datahub.e_enu),
-                   len(self.datahub.n_enu),
-                   len(self.datahub.u_enu))
-
-    def _pull_new_samples(self):
-        total = self._available_count()
-        if total <= self._last_count:
-            return None
-
-        # Datahub에서 ENU 위치/속도 스냅샷 (스레드 세이프)
-        with self.datahub.lock:
-            e = self.datahub.e_enu.copy()
-            n = self.datahub.n_enu.copy()
-            u = self.datahub.u_enu.copy()
-            vE = self.datahub.vE_enu.copy()
-            vN = self.datahub.vN_enu.copy()
-            vU = self.datahub.vU_enu.copy()
-
-        # 새로 들어온 부분만 적재
-        s = self._last_count
-        for Ei, Ni, Ui in zip(e[s:], n[s:], u[s:]):
-            self.E_hist.append(float(Ei))
-            self.N_hist.append(float(Ni))
-            self.U_hist.append(float(Ui))
-            if self.keep_all:
-                self.E_all.append(float(Ei))
-                self.N_all.append(float(Ni))
-                self.U_all.append(float(Ui))
-
-        # 진행방향(속도)은 마지막 샘플을 사용
-        vE_last = float(vE[-1]) if len(vE) else 0.0
-        vN_last = float(vN[-1]) if len(vN) else 0.0
-        vU_last = float(vU[-1]) if len(vU) else 0.0
-
-        self._last_count = total
-        return (vE_last, vN_last, vU_last)
-
-    def _prepare_pos(self):
-        # 전체 유지 or tail
-        if self.keep_all and len(self.E_all) >= 2:
-            e = np.asarray(self.E_all, dtype=float)
-            n = np.asarray(self.N_all, dtype=float)
-            u = np.asarray(self.U_all, dtype=float)
-        else:
-            if len(self.E_hist) < 2:
-                return None
-            e = np.asarray(self.E_hist, dtype=float)
-            n = np.asarray(self.N_hist, dtype=float)
-            u = np.asarray(self.U_hist, dtype=float)
-
-        # 다운샘플링(성능 보호)
-        L = e.shape[0]
-        if L > self.max_draw_pts:
-            step = int(np.ceil(L / self.max_draw_pts))
-            idx = slice(0, L, step)
-            e, n, u = e[idx], n[idx], u[idx]
-
-        return np.column_stack([e, n, u])
-
-    def _add_axes(self):
-        x_axis = gl.GLLinePlotItem(pos=np.array([[0,0,0],[10,0,0]]), color=(1,0,0,1), width=2, antialias=True)
-        y_axis = gl.GLLinePlotItem(pos=np.array([[0,0,0],[0,10,0]]), color=(0,1,0,1), width=2, antialias=True)
-        z_axis = gl.GLLinePlotItem(pos=np.array([[0,0,0],[0,0,10]]), color=(0,0,1,1), width=2, antialias=True)
-        self.view.addItem(x_axis); self.view.addItem(y_axis); self.view.addItem(z_axis)
-
-    def _autoscale_camera_with(self, pos):
-        if pos is None or len(pos) < 2: return
-        e, n, u = pos[:,0], pos[:,1], pos[:,2]
-        e_mid = (e.min()+e.max())/2.0
-        n_mid = (n.min()+n.max())/2.0
-        u_mid = (u.min()+u.max())/2.0
-        max_range = max(e.max()-e.min(), n.max()-n.min(), u.max()-u.min())
-        dist = max(20.0, max_range*1.5)
-        self.view.opts['center'] = self.QVector3D(float(e_mid), float(n_mid), float(u_mid))
-        self.view.setCameraPosition(distance=dist)
-
-    def _update_plot(self):
-        out = self._pull_new_samples()
-        if out is None:
-            return
-        vE, vN, vU = out
-
-        pos = self._prepare_pos()
-        if pos is None:
-            return
-
-        # 궤적/머리 위치
-        if len(pos) >= 2:
-            self.traj_item.setData(pos=pos)
-
-        head = pos[-1].reshape(1,3)
-        self.head_item.setData(pos=head)
-
-        # 진행방향(속도 벡터) : ENU 속도 * 스케일
-        vel_end = head[0] + np.array([vE, vN, vU]) * self.vel_scale
-        self.vel_item.setData(pos=np.vstack([head[0], vel_end]))
-
-        # 오토스케일
-        self._autoscale_camera_with(pos)
-
-    def _add_legend(self):
-        vx, vy, vw, vh = ws.pw_trajectory_geometry
-        pad = 10
-        box_w, box_h = 140, 80
-
-        self.legend_bg = QFrame(self.mainwindow.container)
-        self.legend_bg.setGeometry(vx + pad, vy + pad, box_w, box_h)
-        self.legend_bg.setStyleSheet("""
-            QFrame { background-color: rgba(0,0,0,160); border-radius: 8px; }
-        """)
-        self.legend_bg.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        self.legend_bg.show()
-
-        def add_row(y, rgb, text):
-            r, g, b = rgb
-            sw = QFrame(self.legend_bg); sw.setGeometry(10, y, 16, 16)
-            sw.setStyleSheet(f"background-color: rgb({r},{g},{b}); border: 1px solid rgba(255,255,255,140); border-radius: 3px;")
-            lb = QLabel(text, self.legend_bg); lb.setGeometry(34, y-2, box_w-44, 20)
-            lb.setStyleSheet("color: white;")
-
-        add_row(12, (255,  0,  0), "E (East)  — Red")
-        add_row(34, (  0,255,  0), "N (North) — Green")
-        add_row(56, (  0,  0,255), "U (Up)    — Blue")
-
-    # 리셋들
-    def trajectory_clear(self):
-        try:
-            self.E_hist.clear(); self.N_hist.clear(); self.U_hist.clear()
-        except Exception:
-            from collections import deque
-            self.E_hist = deque(maxlen=self.tail_len)
-            self.N_hist = deque(maxlen=self.tail_len)
-            self.U_hist = deque(maxlen=self.tail_len)
-
-        self._last_count = 0
-        try: self.traj_item.setData(pos=np.zeros((2, 3)))
-        except: pass
-        try: self.head_item.setData(pos=np.array([[0.0, 0.0, 0.0]]))
-        except: pass
-        try: self.vel_item.setData(pos=np.zeros((2, 3)))
-        except: pass
-        try:
-            self.view.opts['center'] = self.QVector3D(0.0, 0.0, 0.0)
-            self.view.setCameraPosition(distance=50)
-        except: pass
-
-    def trajectory_hard_reset(self):
-        self.trajectory_clear()
-        self.E_all.clear(); self.N_all.clear(); self.U_all.clear()
-
-    # QThread 수명주기
-    def run(self):
-        self.exec_()
-
-    def stop(self):
-        try: self.timer.stop()
-        except: pass
-        self.quit(); self.wait(1000)
+#         self.angleSpeed_title.setGeometry(*ws.angleSpeed_title_geometry)
+#         self.accel_title.setGeometry(*ws.accel_title_geometry)
+#         self.speed_title.setGeometry(*ws.speed_title_geometry)
+
+#         self.angleSpeed_title.setFont(ws.font_angleSpeed_title)
+#         self.accel_title.setFont(ws.font_accel_title)
+#         self.speed_title.setFont(ws.font_speed_title)
+
+#         # grids
+#         self.pw_angleSpeed.addItem(GridItem())
+#         self.pw_accel.addItem(GridItem())
+#         self.pw_speed.addItem(GridItem())
+
+#         # axis labels
+#         self.pw_angleSpeed.getPlotItem().getAxis('bottom').setLabel('Time (s)')
+#         self.pw_angleSpeed.getPlotItem().getAxis('left').setLabel('deg/s')
+#         self.pw_accel.getPlotItem().getAxis('bottom').setLabel('Time (s)')
+#         self.pw_accel.getPlotItem().getAxis('left').setLabel('g')
+#         self.pw_speed.getPlotItem().getAxis('bottom').setLabel('Time (s)')
+#         self.pw_speed.getPlotItem().getAxis('left').setLabel('m/s')
+
+#         # ranges
+#         self.pw_angleSpeed.setYRange(-1000, 1000)
+#         self.pw_accel.setYRange(-20, 20)
+#         self.pw_speed.setYRange(-100, 1000)
+
+#         # legends
+#         self.pw_angleSpeed.getPlotItem().addLegend()
+#         self.pw_accel.getPlotItem().addLegend()
+#         self.pw_speed.getPlotItem().addLegend()
+
+#         # curves
+#         self.curve_rollSpeed  = self.pw_angleSpeed.plot(pen='r', name="roll speed")
+#         self.curve_pitchSpeed = self.pw_angleSpeed.plot(pen='g', name="pitch speed")
+#         self.curve_yawSpeed   = self.pw_angleSpeed.plot(pen='b', name="yaw speed")
+
+#         self.curve_xaccel = self.pw_accel.plot(pen='r', name="x acc")
+#         self.curve_yaccel = self.pw_accel.plot(pen='g', name="y acc")
+#         self.curve_zaccel = self.pw_accel.plot(pen='b', name="z acc")
+
+#         self.curve_e_speed = self.pw_speed.plot(pen='r', name='E speed (ENU)')
+#         self.curve_n_speed = self.pw_speed.plot(pen='g', name='N speed (ENU)')
+#         self.curve_u_speed = self.pw_speed.plot(pen='b', name='U speed (ENU)')
+
+#         # buffers
+#         self.tail_len = int(tail_len)
+#         self.time       = np.zeros(self.tail_len)
+#         self.rollSpeed  = np.zeros(self.tail_len)
+#         self.pitchSpeed = np.zeros(self.tail_len)
+#         self.yawSpeed   = np.zeros(self.tail_len)
+#         self.xaccel     = np.zeros(self.tail_len)
+#         self.yaccel     = np.zeros(self.tail_len)
+#         self.zaccel     = np.zeros(self.tail_len)
+#         self.espeed     = np.zeros(self.tail_len)
+#         self.nspeed     = np.zeros(self.tail_len)
+#         self.uspeed     = np.zeros(self.tail_len)
+
+#         # timer (UI 스레드에서 갱신)
+#         self.timer = QTimer(self.mainwindow)
+#         self.timer.timeout.connect(self.update_data)
+#         self.timer.start(int(update_ms))
+
+#     @pyqtSlot()
+#     def update_data(self):
+#         # Datahub에서 스냅샷 추출(락으로 보호)
+#         with self.datahub.lock:
+#             n = len(self.datahub.vE_enu)
+#             if n == 0:
+#                 return
+
+#             # 필요한 배열들만 복사
+#             t           = self.datahub.t.copy()
+#             rollSpeeds  = self.datahub.rollSpeeds.copy()
+#             pitchSpeeds = self.datahub.pitchSpeeds.copy()
+#             yawSpeeds   = self.datahub.yawSpeeds.copy()
+
+#             Xaccels = self.datahub.Xaccels.copy()
+#             Yaccels = self.datahub.Yaccels.copy()
+#             Zaccels = self.datahub.Zaccels.copy()
+
+#             vE = self.datahub.vE_enu.copy()
+#             vN = self.datahub.vN_enu.copy()
+#             vU = self.datahub.vU_enu.copy()
+
+#             hrs  = self.datahub.hours.copy()
+#             mins = self.datahub.mins.copy()
+#             secs = self.datahub.secs.copy()
+#             tenm = self.datahub.tenmilis.copy()
+
+#         L = self.tail_len
+#         # 뷰 버퍼 초기화
+#         self.time.fill(0.0); self.rollSpeed.fill(0.0); self.pitchSpeed.fill(0.0); self.yawSpeed.fill(0.0)
+#         self.xaccel.fill(0.0); self.yaccel.fill(0.0); self.zaccel.fill(0.0)
+#         self.espeed.fill(0.0); self.nspeed.fill(0.0); self.uspeed.fill(0.0)
+
+#         if n <= L:
+#             k = n
+#             self.rollSpeed[-k:]  = rollSpeeds[-k:]
+#             self.pitchSpeed[-k:] = pitchSpeeds[-k:]
+#             self.yawSpeed[-k:]   = yawSpeeds[-k:]
+
+#             self.xaccel[-k:] = Xaccels[-k:]
+#             self.yaccel[-k:] = Yaccels[-k:]
+#             self.zaccel[-k:] = Zaccels[-k:]
+
+#             self.espeed[-k:] = vE[-k:]
+#             self.nspeed[-k:] = vN[-k:]
+#             self.uspeed[-k:] = vU[-k:]
+
+#             # 시간: 누적초 t가 있으면 tail 기준 0으로 정규화
+#             if len(t) >= k:
+#                 tt = t[-k:]
+#                 self.time[-k:] = tt - tt[0]
+#             else:
+#                 t_abs = hrs[-k:]*3600.0 + mins[-k:]*60.0 + secs[-k:] + tenm[-k:]/100.0
+#                 self.time[-k:] = t_abs - t_abs[0]
+#         else:
+#             s = -L
+#             self.rollSpeed[:]  = rollSpeeds[s:]
+#             self.pitchSpeed[:] = pitchSpeeds[s:]
+#             self.yawSpeed[:]   = yawSpeeds[s:]
+
+#             self.xaccel[:] = Xaccels[s:]
+#             self.yaccel[:] = Yaccels[s:]
+#             self.zaccel[:] = Zaccels[s:]
+
+#             self.espeed[:] = vE[s:]
+#             self.nspeed[:] = vN[s:]
+#             self.uspeed[:] = vU[s:]
+
+#             if len(t) >= L:
+#                 tt = t[s:]
+#                 self.time[:] = tt - tt[0]
+#             else:
+#                 t_abs = hrs[s:]*3600.0 + mins[s:]*60.0 + secs[s:] + tenm[s:]/100.0
+#                 self.time[:] = t_abs - t_abs[0]
+
+#         # 그리기
+#         self.curve_rollSpeed.setData(x=self.time, y=self.rollSpeed)
+#         self.curve_pitchSpeed.setData(x=self.time, y=self.pitchSpeed)
+#         self.curve_yawSpeed.setData(x=self.time, y=self.yawSpeed)
+
+#         self.curve_xaccel.setData(x=self.time, y=self.xaccel)
+#         self.curve_yaccel.setData(x=self.time, y=self.yaccel)
+#         self.curve_zaccel.setData(x=self.time, y=self.zaccel)
+
+#         self.curve_e_speed.setData(x=self.time, y=self.espeed)
+#         self.curve_n_speed.setData(x=self.time, y=self.nspeed)
+#         self.curve_u_speed.setData(x=self.time, y=self.uspeed)
+
+#     def graph_clear(self):
+#         for arr in (self.time, self.rollSpeed, self.pitchSpeed, self.yawSpeed,
+#                     self.xaccel, self.yaccel, self.zaccel, self.espeed, self.nspeed, self.uspeed):
+#             arr.fill(0.0)
+
+#         self.curve_rollSpeed.clear(); self.curve_pitchSpeed.clear(); self.curve_yawSpeed.clear()
+#         self.curve_xaccel.clear();    self.curve_yaccel.clear();    self.curve_zaccel.clear()
+#         self.curve_e_speed.clear();   self.curve_n_speed.clear();   self.curve_u_speed.clear()
 
 class MapViewer_Thread(QThread):
     def __init__(self, mainwindow, datahub):
@@ -752,15 +535,13 @@ class MainWindow(PageWindow):
 
         """Start Thread"""
         self.mapviewer = MapViewer_Thread(self,datahub)
-        self.graphviewer = GraphViewer_Thread(self,datahub)
+        # self.graphviewer = GraphViewer_Thread(self,datahub)
         self.rocketviewer = RocketViewer_Thread(self,datahub)
-        self.enuviewer = RealTimeENUPlot(self, datahub)  # ENU 3D 뷰어
 
         self.initMenubar()
 
-        self.enuviewer.start()
         self.mapviewer.start()
-        self.graphviewer.start()
+        # self.graphviewer.start()
         self.rocketviewer.start()
 
         self.resetcheck = 0
@@ -775,49 +556,21 @@ class MainWindow(PageWindow):
         self.stop_button = QPushButton("Stop",self.container)
         self.reset_button = QPushButton("Reset",self.container)
 
-        self.launch1_button = QPushButton("Launch_1",self.container)
-        self.launch2_button = QPushButton("Launch_2",self.container)
-        self.launch_stop_button = QPushButton("Launch\nStop",self.container)
-        self.emergency_parachute_button = QPushButton("Emer\nParachute",self.container)
-        self.staging_stop_button = QPushButton("Staging\nStop",self.container)
-        self.emergency_staging_button = QPushButton("Emer\nStagigng",self.container)
-        self.nc1_button = QPushButton("NC_1",self.container)
-        self.nc2_button = QPushButton("NC_2",self.container)
-        self.nc3_button = QPushButton("NC_3",self.container)
-
         self.now_status = QLabel(ws.wait_status,self.container)
         self.rf_port_edit = QLineEdit("COM8",self.container)
-        self.sender_port_edit = QLineEdit("COM1",self.container)
         self.port_text = QLabel("Rx_Port:",self.container)
-        self.sender_port_text = QLabel("Tx_Port:",self.container)
         self.baudrate_edit = QLineEdit("115200",self.container)
-        self.sender_baudrate_edit = QLineEdit("115200",self.container)
         self.baudrate_text = QLabel("Rx_Baudrate:",self.container)
-        self.sender_baudrate_text = QLabel("Tx_Baudrate:",self.container)
         self.guide_text = QLabel(ws.guide,self.container)
         self.port_text.setStyleSheet("color: white;")
-        self.sender_port_text.setStyleSheet("color: white;")
         self.baudrate_text.setStyleSheet("color: white;")
-        self.sender_baudrate_text.setStyleSheet("color: white;")
 
         self.start_button.setFont(ws.font_start_text)
         self.stop_button.setFont(ws.font_stop_text)
         self.reset_button.setFont(ws.font_reset_text)
 
-        self.launch1_button.setFont(ws.font_button_text)
-        self.launch2_button.setFont(ws.font_button_text)
-        self.launch_stop_button.setFont(ws.font_button_text)
-        self.emergency_parachute_button.setFont(ws.font_button_text)
-        self.staging_stop_button.setFont(ws.font_button_text)
-        self.emergency_staging_button.setFont(ws.font_button_text)
-        self.nc1_button.setFont(ws.font_button_text)
-        self.nc2_button.setFont(ws.font_button_text)
-        self.nc3_button.setFont(ws.font_button_text)
-
         self.rf_port_edit.setStyleSheet("background-color: rgb(255,255,255);")
         self.baudrate_edit.setStyleSheet("background-color: rgb(255,255,255);")
-        self.sender_port_edit.setStyleSheet("background-color: rgb(255,255,255);")
-        self.sender_baudrate_edit.setStyleSheet("background-color: rgb(255,255,255);")
         self.start_button.setStyleSheet("background-color: rgb(200,0,0); color: rgb(250, 250, 250);font-weight: bold; font-weight: bold; border-radius: 25px;")
         self.stop_button.setStyleSheet("background-color: rgb(0,0,139); color: rgb(250, 250, 250);font-weight: bold; font-weight: bold; border-radius: 25px;")
         self.reset_button.setStyleSheet("background-color: rgb(120,120,140); color: rgb(250, 250, 250);font-weight: bold; font-weight: bold; border-radius: 25px;")
@@ -834,17 +587,13 @@ class MainWindow(PageWindow):
 
         self.baudrate_text.setFont(ws.font_baudrate)
         self.port_text.setFont(ws.font_portText)
-        self.sender_baudrate_text.setFont(ws.font_baudrate)
-        self.sender_port_text.setFont(ws.font_portText)
         self.guide_text.setFont(ws.font_guideText)
 
         self.start_button.setEnabled(True)
         self.stop_button.setEnabled(False)
         self.reset_button.setEnabled(False)
         self.rf_port_edit.setEnabled(True)
-        self.sender_port_edit.setEnabled(True)
         self.baudrate_edit.setEnabled(True)
-        self.sender_baudrate_edit.setEnabled(True)
 
         """Set Buttons Connection"""
         self.start_button.clicked.connect(self.start_button_clicked)
@@ -856,46 +605,12 @@ class MainWindow(PageWindow):
         self.stop_button.setGeometry(*ws.stop_geometry)
         self.reset_button.setGeometry(*ws.reset_geometry)
 
-        self.launch1_button.setGeometry(*ws.launch1_geometry)
-        self.launch2_button.setGeometry(*ws.launch2_geometry)
-        self.launch_stop_button.setGeometry(*ws.launch_stop_geometry)
-        self.emergency_parachute_button.setGeometry(*ws.emergency_parachute_geometry)
-        self.staging_stop_button.setGeometry(*ws.staging_stop_geometry)
-        self.emergency_staging_button.setGeometry(*ws.emergency_staging_geometry)
-        self.nc1_button.setGeometry(*ws.nc1_geometry)
-        self.nc2_button.setGeometry(*ws.nc2_geometry)
-        self.nc3_button.setGeometry(*ws.nc3_geometry)
-
         self._toggle_labels = {}
-        def setup_toggle(btn, on_text, off_text, initial=False):
-            base = btn.text()
-            self._toggle_labels[btn] = (f"{base}: {on_text}", f"{base}: {off_text}")
-            btn.setCheckable(True)
-            btn.setChecked(initial)
-            on_label, off_label = self._toggle_labels[btn]
-            btn.setText(on_label if initial else off_label)
-            self._apply_toggle_style(btn, initial)
-            btn.toggled.connect(lambda checked, b=btn: self.on_toggle(b, checked))
-
-        # 라벨은 용도 맞춰 커스텀(필요시 수정 가능)
-        setup_toggle(self.launch1_button,            on_text="\nARMED",  off_text="\nSAFE",   initial=False)
-        setup_toggle(self.launch2_button,            on_text="\nARMED",  off_text="\nSAFE",   initial=False)
-        setup_toggle(self.launch_stop_button,        on_text="\nACTIVE", off_text="\nIDLE",   initial=False)
-        setup_toggle(self.emergency_parachute_button,on_text="\nREADY",  off_text="\nIDLE",   initial=False)
-        setup_toggle(self.staging_stop_button,       on_text="\nACTIVE", off_text="\nIDLE",   initial=False)
-        setup_toggle(self.emergency_staging_button,  on_text="\nREADY",  off_text="\nIDLE",   initial=False)
-        setup_toggle(self.nc1_button,                on_text="\nON",     off_text="\nOFF",    initial=False)
-        setup_toggle(self.nc2_button,                on_text="\nON",     off_text="\nOFF",    initial=False)
-        setup_toggle(self.nc3_button,                on_text="\nON",     off_text="\nOFF",    initial=False)
 
         self.port_text.setGeometry(*ws.port_text_geometry)
         self.rf_port_edit.setGeometry(*ws.port_edit_geometry)
         self.baudrate_text.setGeometry(*ws.baudrate_text_geometry)
         self.baudrate_edit.setGeometry(*ws.baudrate_edit_geometry)
-        self.sender_port_text.setGeometry(*ws.sender_port_text_geometry)
-        self.sender_port_edit.setGeometry(*ws.sender_port_edit_geometry)
-        self.sender_baudrate_text.setGeometry(*ws.sender_baudrate_text_geometry)
-        self.sender_baudrate_edit.setGeometry(*ws.sender_baudrate_edit_geometry)
         self.guide_text.setGeometry(*ws.cmd_geometry)
         self.now_status.setGeometry(*ws.status_geometry)
         self.now_status.setFont(ws.font_status_text)
@@ -921,15 +636,6 @@ class MainWindow(PageWindow):
         )
         self.irri_logo.setGeometry(*ws.irri_logo_geometry)
 
-        # patch logo
-        patch_path = base_dir / 'patch.png'
-        self.patch_logo = QLabel(self.container)
-        self.patch_logo.setPixmap(
-            QPixmap(str(patch_path))
-            .scaled(*ws.patch_logo_geometry[2:4], Qt.KeepAspectRatio)
-        )
-        self.patch_logo.setGeometry(*ws.patch_logo_geometry)
-
         # patch22 logo
         patch22_path = base_dir / '22patch.png'
         self.patch22_logo = QLabel(self.container)
@@ -938,28 +644,13 @@ class MainWindow(PageWindow):
             .scaled(*ws.patch22_logo_geometry[2:4], Qt.KeepAspectRatio)
         )
         self.patch22_logo.setGeometry(*ws.patch22_logo_geometry)
-
-        # patch24 logo
-        patch24_path = base_dir / '24patch.png'
-        self.patch24_logo = QLabel(self.container)
-        self.patch24_logo.setPixmap(
-            QPixmap(str(patch24_path))
-            .scaled(*ws.patch24_logo_geometry[2:4], Qt.KeepAspectRatio)
-        )
-        self.patch24_logo.setGeometry(*ws.patch24_logo_geometry)
     
     #상단 메뉴바
     def initMenubar(self):
         self.statusBar()
 
-        change_Action = QAction('Analysis', self.container)
-        change_Action.setShortcut('Ctrl+L')
-        change_Action.triggered.connect(self.gosub)
-
         menubar = self.menuBar()
         menubar.setNativeMenuBar(False)
-        filemenu = menubar.addMenu('Menu')
-        filemenu.addAction(change_Action)
         # 스타일시트 수정
         self.setStyleSheet("""
             QMenuBar {
@@ -979,118 +670,66 @@ class MainWindow(PageWindow):
         """)
 
     def initGraph(self):
-        self.xspeed_hide_checkbox = QCheckBox("v_x", self.container)
-        self.xspeed_hide_checkbox.setStyleSheet("color: white;")
+        pass
+        # self.xspeed_hide_checkbox = QCheckBox("v_x", self.container)
+        # self.xspeed_hide_checkbox.setStyleSheet("color: white;")
 
-        self.yspeed_hide_checkbox = QCheckBox("v_y", self.container)
-        self.yspeed_hide_checkbox.setStyleSheet("color: white;")
+        # self.yspeed_hide_checkbox = QCheckBox("v_y", self.container)
+        # self.yspeed_hide_checkbox.setStyleSheet("color: white;")
 
-        self.zspeed_hide_checkbox = QCheckBox("v_z", self.container)
-        self.zspeed_hide_checkbox.setStyleSheet("color: white;")
+        # self.zspeed_hide_checkbox = QCheckBox("v_z", self.container)
+        # self.zspeed_hide_checkbox.setStyleSheet("color: white;")
 
-        self.rollspeed_hide_checkbox = QCheckBox("w_x",self.container)
-        self.rollspeed_hide_checkbox.setStyleSheet("color: white;")
+        # self.rollspeed_hide_checkbox = QCheckBox("w_x",self.container)
+        # self.rollspeed_hide_checkbox.setStyleSheet("color: white;")
         
-        self.pitchspeed_hide_checkbox = QCheckBox("w_y",self.container)
-        self.pitchspeed_hide_checkbox.setStyleSheet("color: white;")
+        # self.pitchspeed_hide_checkbox = QCheckBox("w_y",self.container)
+        # self.pitchspeed_hide_checkbox.setStyleSheet("color: white;")
         
-        self.yawspeed_hide_checkbox = QCheckBox("w_z",self.container)
-        self.yawspeed_hide_checkbox.setStyleSheet("color: white;")
+        # self.yawspeed_hide_checkbox = QCheckBox("w_z",self.container)
+        # self.yawspeed_hide_checkbox.setStyleSheet("color: white;")
 
-        self.xacc_hide_checkbox = QCheckBox("a_x",self.container)
-        self.xacc_hide_checkbox.setStyleSheet("color: white;")
+        # self.xacc_hide_checkbox = QCheckBox("a_x",self.container)
+        # self.xacc_hide_checkbox.setStyleSheet("color: white;")
         
-        self.yacc_hide_checkbox = QCheckBox("a_y",self.container)
-        self.yacc_hide_checkbox.setStyleSheet("color: white;")
+        # self.yacc_hide_checkbox = QCheckBox("a_y",self.container)
+        # self.yacc_hide_checkbox.setStyleSheet("color: white;")
         
-        self.zacc_hide_checkbox = QCheckBox("a_z",self.container)
-        self.zacc_hide_checkbox.setStyleSheet("color: white;")
+        # self.zacc_hide_checkbox = QCheckBox("a_z",self.container)
+        # self.zacc_hide_checkbox.setStyleSheet("color: white;")
 
-        self.xspeed_hide_checkbox.setGeometry(*ws.vx_checker_geometry)
-        self.yspeed_hide_checkbox.setGeometry(*ws.vy_checker_geometry)
-        self.zspeed_hide_checkbox.setGeometry(*ws.vz_checker_geometry)
+        # self.xspeed_hide_checkbox.setGeometry(*ws.vx_checker_geometry)
+        # self.yspeed_hide_checkbox.setGeometry(*ws.vy_checker_geometry)
+        # self.zspeed_hide_checkbox.setGeometry(*ws.vz_checker_geometry)
 
-        self.rollspeed_hide_checkbox.setGeometry(*ws.rollS_checker_geomoetry)
-        self.pitchspeed_hide_checkbox.setGeometry(*ws.pitchS_checker_geomoetry)
-        self.yawspeed_hide_checkbox.setGeometry(*ws.yawS_checker_geomoetry)
+        # self.rollspeed_hide_checkbox.setGeometry(*ws.rollS_checker_geomoetry)
+        # self.pitchspeed_hide_checkbox.setGeometry(*ws.pitchS_checker_geomoetry)
+        # self.yawspeed_hide_checkbox.setGeometry(*ws.yawS_checker_geomoetry)
 
-        self.xacc_hide_checkbox.setGeometry(*ws.ax_checker_geomoetry)
-        self.yacc_hide_checkbox.setGeometry(*ws.ay_checker_geomoetry)
-        self.zacc_hide_checkbox.setGeometry(*ws.az_checker_geomoetry)
+        # self.xacc_hide_checkbox.setGeometry(*ws.ax_checker_geomoetry)
+        # self.yacc_hide_checkbox.setGeometry(*ws.ay_checker_geomoetry)
+        # self.zacc_hide_checkbox.setGeometry(*ws.az_checker_geomoetry)
 
-        self.xacc_hide_checkbox.setFont(ws.checker_font)
-        self.yacc_hide_checkbox.setFont(ws.checker_font)
-        self.zacc_hide_checkbox.setFont(ws.checker_font)
+        # self.xacc_hide_checkbox.setFont(ws.checker_font)
+        # self.yacc_hide_checkbox.setFont(ws.checker_font)
+        # self.zacc_hide_checkbox.setFont(ws.checker_font)
 
-        self.xspeed_hide_checkbox.stateChanged.connect(self.xspeed_hide_checkbox_state)
-        self.yspeed_hide_checkbox.stateChanged.connect(self.yspeed_hide_checkbox_state)
-        self.zspeed_hide_checkbox.stateChanged.connect(self.zspeed_hide_checkbox_state)
-        self.rollspeed_hide_checkbox.stateChanged.connect(self.rollspeed_hide_checkbox_state)
-        self.pitchspeed_hide_checkbox.stateChanged.connect(self.pitchspeed_hide_checkbox_state)
-        self.yawspeed_hide_checkbox.stateChanged.connect(self.yawspeed_hide_checkbox_state)
-        self.xacc_hide_checkbox.stateChanged.connect(self.xacc_hide_checkbox_state)
-        self.yacc_hide_checkbox.stateChanged.connect(self.yacc_hide_checkbox_state)
-        self.zacc_hide_checkbox.stateChanged.connect(self.zacc_hide_checkbox_state)
+        # self.xspeed_hide_checkbox.stateChanged.connect(self.xspeed_hide_checkbox_state)
+        # self.yspeed_hide_checkbox.stateChanged.connect(self.yspeed_hide_checkbox_state)
+        # self.zspeed_hide_checkbox.stateChanged.connect(self.zspeed_hide_checkbox_state)
+        # self.rollspeed_hide_checkbox.stateChanged.connect(self.rollspeed_hide_checkbox_state)
+        # self.pitchspeed_hide_checkbox.stateChanged.connect(self.pitchspeed_hide_checkbox_state)
+        # self.yawspeed_hide_checkbox.stateChanged.connect(self.yawspeed_hide_checkbox_state)
+        # self.xacc_hide_checkbox.stateChanged.connect(self.xacc_hide_checkbox_state)
+        # self.yacc_hide_checkbox.stateChanged.connect(self.yacc_hide_checkbox_state)
+        # self.zacc_hide_checkbox.stateChanged.connect(self.zacc_hide_checkbox_state)
 
-        self.xspeed_hide_checkbox.setFont(ws.checker_font)
-        self.yspeed_hide_checkbox.setFont(ws.checker_font)
-        self.zspeed_hide_checkbox.setFont(ws.checker_font)
-        self.rollspeed_hide_checkbox.setFont(ws.checker_font)
-        self.pitchspeed_hide_checkbox.setFont(ws.checker_font)
-        self.yawspeed_hide_checkbox.setFont(ws.checker_font)
-
-    def gosub(self):
-        self.goto("sub")
-
-    def _apply_toggle_style(self, btn, checked: bool):
-        if checked:
-            btn.setStyleSheet(
-                "background-color: rgb(20,120,40); color: white; font-weight: bold; border-radius: 12px;"
-            )
-        else:
-            btn.setStyleSheet(
-                "background-color: rgb(60,60,70); color: white; border-radius: 12px;"
-            )
-    
-    def bin8_with_space(val: int) -> str:
-        """uint8 값을 '0000 0000' 형태의 이진 문자열로 변환"""
-        v = int(val) & 0xFF
-        s = format(v, '08b')   # 예: '00101101'
-        return f"{s[:4]} {s[4:]}"  # 예: '0010 1101'
-
-    def on_toggle(self, btn, checked: bool):
-        """토글 상태 변경 시 라벨/스타일 갱신 + 버튼 상태를 button_data(1byte)에 반영"""
-        # 1) 라벨/스타일 갱신
-        on_label, off_label = self._toggle_labels[btn]
-        btn.setText(on_label if checked else off_label)
-        self._apply_toggle_style(btn, checked)
-
-        # 2) 현재 UI의 토글 상태들로부터 '새 버튼 바이트'를 완전히 재계산
-        new_val = 0
-
-        # bit0: launch1 & launch2 가 모두 ON일 때 1
-        if self.launch1_button.isChecked() and self.launch2_button.isChecked():
-            new_val |= (1 << 0)
-
-        # 나머지 비트: 개별 토글의 현재 상태를 그대로 반영
-        if self.launch_stop_button.isChecked():
-            new_val |= (1 << 1)
-        if self.emergency_parachute_button.isChecked():
-            new_val |= (1 << 2)
-        if self.staging_stop_button.isChecked():
-            new_val |= (1 << 3)
-        if self.emergency_staging_button.isChecked():
-            new_val |= (1 << 4)
-        if self.nc1_button.isChecked():
-            new_val |= (1 << 5)
-        if self.nc2_button.isChecked():
-            new_val |= (1 << 6)
-        if self.nc3_button.isChecked():
-            new_val |= (1 << 7)
-
-        # 3) 최신 값 저장 (변화가 있을 때만 append 하고 싶다면 if 조건 추가)
-        # if self.datahub.button_data.size == 0 or int(self.datahub.button_data[-1]) != new_val:
-        self.datahub.button_data = np.append(self.datahub.button_data, np.uint8(new_val))
+        # self.xspeed_hide_checkbox.setFont(ws.checker_font)
+        # self.yspeed_hide_checkbox.setFont(ws.checker_font)
+        # self.zspeed_hide_checkbox.setFont(ws.checker_font)
+        # self.rollspeed_hide_checkbox.setFont(ws.checker_font)
+        # self.pitchspeed_hide_checkbox.setFont(ws.checker_font)
+        # self.yawspeed_hide_checkbox.setFont(ws.checker_font)
 
     # Run when start button is clicked
     def start_button_clicked(self):
@@ -1137,10 +776,6 @@ class MainWindow(PageWindow):
             port_text = self.rf_port_edit.text().strip().upper()
 
             if port_text == "CSV":
-                # 1) TX 포트/보드레이트 입력 자체를 잠금 (추가 설정 불필요)
-                self.sender_port_edit.setEnabled(False)
-                self.sender_baudrate_edit.setEnabled(False)
-
                 # 선택한 CSV 파일 열기…
                 start_dir = os.path.join(dirname(self.dir_path), "log")
                 if not os.path.isdir(start_dir):
@@ -1149,11 +784,6 @@ class MainWindow(PageWindow):
                 csv_path, _ = QFileDialog.getOpenFileName(
                     self, "Select CSV to Replay", start_dir, "CSV Files (*.csv);;All Files (*)"
                 )
-                if not csv_path:
-                    # 사용자가 취소 → UI 원복
-                    self.sender_port_edit.setEnabled(True)
-                    self.sender_baudrate_edit.setEnabled(True)
-                    return
 
                 self.replay_csv_path = csv_path
 
@@ -1172,7 +802,7 @@ class MainWindow(PageWindow):
                 # 3) CSVPlayer 시작
                 try:
                     self.csv_player = CSVPlayer(self.replay_csv_path, self.datahub, hz=5.0, parent=self)
-                    self.csv_player.sampleReady.connect(self.graphviewer.update_data)
+                    # self.csv_player.sampleReady.connect(self.graphviewer.update_data)
                     self.csv_player.start()
                 except Exception as e:
                     print(f"[CSVPlayer] start error: {e}")
@@ -1184,8 +814,6 @@ class MainWindow(PageWindow):
                     self.stop_button.setEnabled(False)
                     self.rf_port_edit.setEnabled(True)
                     self.baudrate_edit.setEnabled(True)
-                    self.sender_port_edit.setEnabled(True)
-                    self.sender_baudrate_edit.setEnabled(True)
                 return  # CSV 모드는 여기서 종료
 
             else:
@@ -1195,8 +823,6 @@ class MainWindow(PageWindow):
                 if ok:
                     self.datahub.mySerialPort = self.rf_port_edit.text()
                     self.datahub.myBaudrate   = self.baudrate_edit.text()
-                    self.datahub.mySendSerialPort = self.sender_port_edit.text()
-                    self.datahub.mySendBaudrate   = self.sender_baudrate_edit.text()
                     self.datahub.file_Name    = FileName + '.csv'
 
                     # 1) 통신 시작
@@ -1281,8 +907,6 @@ class MainWindow(PageWindow):
         self.reset_button.setEnabled(True)
         self.rf_port_edit.setEnabled(True)
         self.baudrate_edit.setEnabled(True)
-        self.sender_port_edit.setEnabled(True)
-        self.sender_baudrate_edit.setEnabled(True)
         self.shadow_start_button.setOffset(6)
         self.shadow_stop_button.setOffset(0)
         self.shadow_reset_button.setOffset(6)
@@ -1311,13 +935,10 @@ class MainWindow(PageWindow):
             self.stop_button.setEnabled(False)
             self.reset_button.setEnabled(False)
             self.rf_port_edit.setEnabled(False)
-            self.sender_port_edit.setEnabled(True)
-            self.sender_baudrate_edit.setEnabled(True)
             self.shadow_start_button.setOffset(6)
             self.shadow_stop_button.setOffset(0)
             self.shadow_reset_button.setOffset(0)
-            self.graphviewer.graph_clear()
-            self.enuviewer.trajectory_clear()
+            # self.graphviewer.graph_clear()
             self.rocketviewer.data_label_clear()
             self.datahub.clear()
             self.resetcheck = 0
@@ -1328,70 +949,24 @@ class MainWindow(PageWindow):
 
 
     #curve hide check box is clicked
-    def xspeed_hide_checkbox_state(self,state):
-        self.graphviewer.curve_xspeed.setVisible(state != Qt.Checked)
-    def yspeed_hide_checkbox_state(self,state):
-        self.graphviewer.curve_yspeed.setVisible(state != Qt.Checked)
-    def zspeed_hide_checkbox_state(self,state):
-        self.graphviewer.curve_zspeed.setVisible(state != Qt.Checked)        
-    def rollspeed_hide_checkbox_state(self,state):
-        self.graphviewer.curve_rollSpeed.setVisible(state != Qt.Checked)
-    def pitchspeed_hide_checkbox_state(self,state):
-        self.graphviewer.curve_pitchSpeed.setVisible(state != Qt.Checked)
-    def yawspeed_hide_checkbox_state(self,state):
-        self.graphviewer.curve_yawSpeed.setVisible(state != Qt.Checked)
-    def xacc_hide_checkbox_state(self,state):
-        self.graphviewer.curve_xaccel.setVisible(state != Qt.Checked)
-    def yacc_hide_checkbox_state(self,state):
-        self.graphviewer.curve_yaccel.setVisible(state != Qt.Checked)
-    def zacc_hide_checkbox_state(self,state):
-        self.graphviewer.curve_zaccel.setVisible(state != Qt.Checked)
-
-    def _install_shortcuts_clicked(self):
-        """단축키로 실제 버튼 .click()을 호출한다.
-        → 마우스 클릭과 동일하게 clicked/toggled 시그널이 흐름."""
-        self._shortcuts = []  # 가비지 컬렉션 방지용 보관
-
-        # 단축키 → 버튼.click 매핑
-        mapping = {
-            "F5":   self.start_button.click,       # Start
-            "F6":   self.stop_button.click,        # Stop
-            "F9":   self.reset_button.click,       # Reset
-
-            "Alt+1": self.launch1_button.click,    # Launch_1 (토글)
-            "Alt+2": self.launch2_button.click,    # Launch_2 (토글)
-            "Alt+3": self.launch_stop_button.click,# Launch_Stop (토글)
-
-            "Alt+4": self.emergency_parachute_button.click,  # Emer_Parachute (토글)
-            "Alt+5": self.staging_stop_button.click,         # Staging_Stop (토글)
-            "Alt+6": self.emergency_staging_button.click,    # Emer_Stagigng (토글)
-
-            "Alt+7": self.nc1_button.click,        # NC_1 (토글)
-            "Alt+8": self.nc2_button.click,        # NC_2 (토글)
-            "Alt+9": self.nc3_button.click,        # NC_3 (토글)
-        }
-
-        for seq, func in mapping.items():
-            sc = QShortcut(QKeySequence(seq), self)
-            # 페이지 어디에 포커스가 있어도 동작하게 전역 컨텍스트로
-            sc.setContext(Qt.ApplicationShortcut)
-            sc.activated.connect(func)
-            self._shortcuts.append(sc)
-
-        # 각 버튼 툴팁에 단축키 표시(선택)
-        for seq, func in mapping.items():
-            # func는 button.click이므로, button 객체를 다시 얻어온다
-            # (람다/partial로 버튼을 같이 보관해도 좋지만, 여기선 간단히 매핑 한번 더 해줌)
-            pass
-
-        button_by_seq = {
-            "F5": self.start_button, "F6": self.stop_button, "F9": self.reset_button,
-            "Alt+1": self.launch1_button, "Alt+2": self.launch2_button, "Alt+0": self.launch_stop_button,
-            "Alt+P": self.emergency_parachute_button, "Alt+G": self.staging_stop_button, "Alt+E": self.emergency_staging_button,
-            "Alt+Z": self.nc1_button, "Alt+X": self.nc2_button, "Alt+C": self.nc3_button,
-        }
-        for seq, btn in button_by_seq.items():
-            btn.setToolTip((btn.toolTip() + " | " if btn.toolTip() else "") + f"Shortcut: {seq}")
+    # def xspeed_hide_checkbox_state(self,state):
+    #     self.graphviewer.curve_xspeed.setVisible(state != Qt.Checked)
+    # def yspeed_hide_checkbox_state(self,state):
+    #     self.graphviewer.curve_yspeed.setVisible(state != Qt.Checked)
+    # def zspeed_hide_checkbox_state(self,state):
+    #     self.graphviewer.curve_zspeed.setVisible(state != Qt.Checked)        
+    # def rollspeed_hide_checkbox_state(self,state):
+    #     self.graphviewer.curve_rollSpeed.setVisible(state != Qt.Checked)
+    # def pitchspeed_hide_checkbox_state(self,state):
+    #     self.graphviewer.curve_pitchSpeed.setVisible(state != Qt.Checked)
+    # def yawspeed_hide_checkbox_state(self,state):
+    #     self.graphviewer.curve_yawSpeed.setVisible(state != Qt.Checked)
+    # def xacc_hide_checkbox_state(self,state):
+    #     self.graphviewer.curve_xaccel.setVisible(state != Qt.Checked)
+    # def yacc_hide_checkbox_state(self,state):
+    #     self.graphviewer.curve_yaccel.setVisible(state != Qt.Checked)
+    # def zacc_hide_checkbox_state(self,state):
+    #     self.graphviewer.curve_zaccel.setVisible(state != Qt.Checked)
 
 class CSVPlayer(QThread):
     sampleReady = pyqtSignal()
@@ -1557,244 +1132,6 @@ class TimeAxisItem(AxisItem):
     def tickStrings(self, values, scale, spacing):
         return [str(timedelta(milliseconds = millis))[:-4] for millis in values]
 
-#  Analysis1
-class SubWindow(PageWindow):
-    def __init__(self,datahub):
-        self.log_dir = 'log'  # log 폴더 경로 설정
-        super().__init__()
-        
-        self.datahub = datahub
-        self.timespace = None
-        self.initUI()
-        self.initGraph()
-        self.initMenubar()
-
-    def initUI(self):
-        self.csv_name_edit = QLineEdit("{}".format(self.datahub.file_Name),self)
-        self.analysis_button = QPushButton("Analysis", self)
-        self.analysis_angular_button = QPushButton("Angular Data Analysis", self)
-        self.analysis_alnsp_button = QPushButton("Altitude & Speed Analysis", self)
-        self.set_range_button = QPushButton("Reset range", self)
-        self.max_altitude_label = QLabel("Max. altitude",self)
-        self.max_speed_label = QLabel("Max. speed",self)
-        self.max_accel_label = QLabel("Max. accel", self)
-
-        self.max_altitude = QLabel("0 ",self)
-        self.max_speed = QLabel("0 ",self)
-        self.max_accel = QLabel("0 ", self)
-
-        self.max_altitude_label.setStyleSheet("font-weight: bold; color: #00ff00;")
-        self.max_speed_label.setStyleSheet("font-weight: bold; color: #00ff00;")
-        self.max_accel_label.setStyleSheet("font-weight: bold; color: #00ff00;")
-        self.max_altitude.setStyleSheet("font-weight: bold; color: #00ff00;")
-        self.max_speed.setStyleSheet("font-weight: bold; color: #00ff00;")
-        self.max_accel.setStyleSheet("font-weight: bold; color: #00ff00;")
-        self.analysis_button.setStyleSheet("background-color: rgb(120,120,140); font-weight: bold; border-radius: 25px; color: #ffffff;")
-        self.analysis_angular_button.setStyleSheet("background-color: rgb(120,120,140); font-weight: bold; border-radius: 25px; color: #ffffff;")
-        self.analysis_alnsp_button.setStyleSheet("background-color: rgb(120,120,140); font-weight: bold; border-radius: 25px; color: #ffffff;")
-        self.set_range_button.setStyleSheet("background-color: rgb(120,120,140); font-weight: bold; border-radius: 25px; color: #ffffff;")
-        self.csv_name_edit.setStyleSheet("background-color: rgb(250,250,250); color: black;")
-
-        self.shadow_analysis_button = QGraphicsDropShadowEffect()
-        self.shadow_analysis_angular_button = QGraphicsDropShadowEffect()
-        self.shadow_analysis_alnsp_button = QGraphicsDropShadowEffect()
-        self.shadow_set_range_button = QGraphicsDropShadowEffect()
-        self.shadow_analysis_button.setOffset(6)
-        self.shadow_analysis_angular_button.setOffset(6)
-        self.shadow_analysis_alnsp_button.setOffset(6)
-        self.shadow_set_range_button.setOffset(6)
-        self.analysis_button.setGraphicsEffect(self.shadow_analysis_button)
-        self.analysis_angular_button.setGraphicsEffect(self.shadow_analysis_angular_button)
-        self.analysis_alnsp_button.setGraphicsEffect(self.shadow_analysis_alnsp_button)
-        self.set_range_button.setGraphicsEffect(self.shadow_set_range_button)
-
-        self.csv_name_edit.setGeometry(*ws.csv_name_geometry)
-        self.analysis_button.setGeometry(*ws.analysis_button_geometry)
-        self.analysis_angular_button.setGeometry(*ws.analysis_angular_button_geometry)
-        self.analysis_alnsp_button.setGeometry(*ws.analysis_alnsp_button_geometry)
-        self.set_range_button.setGeometry(*ws.set_range_geometry)
-        self.max_altitude_label.setGeometry(*ws.max_altitude_label_geometry)
-        self.max_speed_label.setGeometry(*ws.max_speed_label_geometry)
-        self.max_accel_label.setGeometry(*ws.max_accel_label_geometry)
-        self.max_altitude.setGeometry(*ws.max_altitude_geometry)
-        self.max_speed.setGeometry(*ws.max_speed_geometry)
-        self.max_accel.setGeometry(*ws.max_accel_geometry)
-        
-
-        self.max_altitude_label.setFont(ws.font_max_alti_label_text)
-        self.max_speed_label.setFont(ws.font_max_speed_label_text)
-        self.max_accel_label.setFont(ws.font_max_accel_label_text)
-        self.max_altitude.setFont(ws.font_max_alti_text)
-        self.max_speed.setFont(ws.font_max_speed_text)
-        self.max_accel.setFont(ws.font_max_accel_text)
-
-        self.analysis_button.clicked.connect(self.start_analysis)
-        self.analysis_angular_button.clicked.connect(self.start_angularGraph)
-        self.analysis_alnsp_button.clicked.connect(self.start_alnspGraph)
-        self.set_range_button.clicked.connect(self.reset_range)
-
-        path = abspath(__file__)
-        dir_path = dirname(path)
-
-    def initGraph(self):
-        self.gr_angle = PlotWidget(self, axisItems={'bottom': TimeAxisItem(orientation='bottom')})
-        self.gr_angleSpeed = PlotWidget(self, axisItems={'bottom': TimeAxisItem(orientation='bottom')})
-        self.gr_accel = PlotWidget(self, axisItems={'bottom': TimeAxisItem(orientation='bottom')})
-        self.gr_altitude = PlotWidget(self, axisItems={'bottom': TimeAxisItem(orientation='bottom')})
-        self.gr_speed = PlotWidget(self, axisItems={'bottom': TimeAxisItem(orientation='bottom')})
-
-        self.gr_angle.setGeometry(*ws.gr_angle_geometry)
-        self.gr_angleSpeed.setGeometry(*ws.gr_angleSpeed_geometry)
-        self.gr_accel.setGeometry(*ws.gr_accel_geometry)
-        self.gr_altitude.setGeometry(*ws.gr_angle_geometry)
-        self.gr_speed.setGeometry(*ws.gr_angleSpeed_geometry)
-
-        self.gr_angle.addItem(GridItem())
-        self.gr_angleSpeed.addItem(GridItem())
-        self.gr_accel.addItem(GridItem())
-        self.gr_altitude.addItem(GridItem())
-        self.gr_speed.addItem(GridItem())
-
-        self.gr_angle.getPlotItem().getAxis('left').setLabel('Degree')
-        self.gr_angleSpeed.getPlotItem().getAxis('left').setLabel('Degree/second')
-        self.gr_accel.getPlotItem().getAxis('left').setLabel('g(gravity accel)')
-        self.gr_altitude.getPlotItem().getAxis('left').setLabel('Altitude')
-        self.gr_speed.getPlotItem().getAxis('left').setLabel('Speed')
-
-        self.gr_angle.getPlotItem().addLegend()
-        self.gr_angleSpeed.getPlotItem().addLegend()
-        self.gr_accel.getPlotItem().addLegend()
-        self.gr_altitude.getPlotItem().addLegend()
-        self.gr_speed.getPlotItem().addLegend()
-
-        self.curve_roll = self.gr_angle.plot(pen='r', name = "roll")
-        self.curve_pitch = self.gr_angle.plot(pen='g',name = "pitch")
-        self.curve_yaw = self.gr_angle.plot(pen='b', name = "yaw")
-
-        self.curve_rollSpeed = self.gr_angleSpeed.plot(pen='r', name = "roll speed")
-        self.curve_pitchSpeed = self.gr_angleSpeed.plot(pen='g', name = "pitch speed")
-        self.curve_yawSpeed = self.gr_angleSpeed.plot(pen='b', name = "yaw speed")
-
-        self.curve_xaccel = self.gr_accel.plot(pen='r', name = "x acc")
-        self.curve_yaccel = self.gr_accel.plot(pen='g',name = "y acc")
-        self.curve_zaccel = self.gr_accel.plot(pen='b',name ="z acc")
-
-        self.curve_altitude = self.gr_altitude.plot(pen='g', name = "altitude")
-
-        self.curve_xspeed = self.gr_speed.plot(pen='r', name = "x speed")
-        self.curve_yspeed = self.gr_speed.plot(pen='g', name = "y speed")
-        self.curve_zspeed = self.gr_speed.plot(pen='b', name = "z speed")
-
-        self.gr_altitude.hide()
-        self.gr_speed.hide()
-        self.analysis_angular_button.setEnabled(False)
-        self.analysis_alnsp_button.setEnabled(True)
-
-    def start_angularGraph(self):
-        self.gr_altitude.hide()
-        self.gr_speed.hide()
-        self.gr_angle.show()
-        self.gr_angleSpeed.show()
-        self.gr_accel.show()
-        self.analysis_angular_button.setEnabled(False)
-        self.analysis_alnsp_button.setEnabled(True)
-
-        
-    def start_alnspGraph(self):
-            self.gr_angle.hide()
-            self.gr_angleSpeed.hide()
-            self.gr_accel.hide()
-            self.gr_altitude.show()
-            self.gr_speed.show()
-            self.analysis_angular_button.setEnabled(True)
-            self.analysis_alnsp_button.setEnabled(False)
-
-    def initMenubar(self):
-        self.statusBar()
-
-        change_Action = QAction('Real-Time Viewer', self)
-        change_Action.setShortcut('Ctrl+L')
-        change_Action.triggered.connect(self.gomain)
-
-        menubar = self.menuBar()
-        menubar.setNativeMenuBar(False)
-        # 스타일시트 수정
-        self.setStyleSheet("""
-            QMenuBar {
-                background-color: rgb(50,50,50);
-                color: rgb(255,255,255);
-                border: 1px solid rgb(50,50,50);
-            }
-            QMenu {
-                background-color: rgb(255,255,255);  /* 메뉴 드롭다운 창의 배경색 */
-                color: rgb(0,0,0);          /* 메뉴 항목의 글씨 색 */
-                border: 1px solid rgb(50,50,50);  /* 메뉴 드롭다운 창의 테두리 색 */
-            }
-            QMenu::item::selected {
-                background-color: rgb(50,50,50);  /* 선택된 메뉴 항목의 배경색 */
-                color: rgb(255,255,255);          /* 선택된 메뉴 항목의 글씨 색 */
-            }
-        """)
-
-        filemenu = menubar.addMenu('Menu')
-        filemenu.addAction(change_Action)
-
-    def start_analysis(self):
-        self.csv_name = self.csv_name_edit.text()
-        # Combine the log directory and the CSV file name to create the full file path
-        csv_path = os.path.join(self.log_dir, self.csv_name)
-        
-        try:
-            # Use the complete path for reading the CSV file
-            alldata = pd.read_csv(csv_path).to_numpy()
-            
-            # Rest of your data processing code
-            init_time = alldata[0,0]*3600 + alldata[0,1]*60 + alldata[0,2] + alldata[0,3]*0.01
-            self.timespace = alldata[:,0]*3600000 + alldata[:,1]*60000 + alldata[:,2]*1000 + alldata[:,3]*10
-
-            # Other data processing code...
-
-            self.start_angularGraph()
-
-        except Exception as e:
-            print(f"Error: {e}")  # Print the error for debugging
-            msg_box = QMessageBox(self)
-            self.setStyleSheet("""
-                QMessageBox {
-                    background-color: black;
-                    color: white;
-                }
-                QLabel {
-                    background-color: black;           
-                    color: white;
-                }
-                QPushButton {
-                    background-color: white;
-                    color: black;
-                }
-                QInputDialog {
-                    background-color: black;
-                    color: black;
-                }
-                QLineEdit {
-                    background-color: white;
-                    color: black;
-                }
-            """)
-            msg_box.warning(self, "warning", "File open error")
-            
-
-    def gomain(self):
-        self.goto("main")
-
-    def reset_range(self):
-        if self.timespace is not None:
-            self.gr_angle.setXRange(min(self.timespace),max(self.timespace))
-            self.gr_angleSpeed.setXRange(min(self.timespace),max(self.timespace))
-            self.gr_accel.setXRange(min(self.timespace),max(self.timespace))
-            self.gr_speed.setXRange(min(self.timespace),max(self.timespace))
-            self.gr_altitude.setXRange(min(self.timespace),max(self.timespace))
-
 class window(QMainWindow):
     def __init__(self,datahub):
         self.app = QApplication(argv)
@@ -1803,7 +1140,6 @@ class window(QMainWindow):
 
         self.initUI()
         self.initWindows()
-        self.goto("main")
 
     def initUI(self):
         self.resize(*ws.full_size)
@@ -1818,24 +1154,10 @@ class window(QMainWindow):
 
     def initWindows(self):
         self.mainwindow = MainWindow(self.datahub)
-        self.subwindow = SubWindow(self.datahub)
 
         self.stacked_widget = QStackedWidget()
         self.setCentralWidget(self.stacked_widget)
         self.stacked_widget.addWidget(self.mainwindow)
-        self.stacked_widget.addWidget(self.subwindow)
-
-        self.mainwindow.gotoSignal.connect(self.goto)
-        self.subwindow.gotoSignal.connect(self.goto)
-
-    @pyqtSlot(str)
-    def goto(self, name):
-        if name == "main":
-            self.stacked_widget.setCurrentWidget(self.mainwindow)
-
-        if name == "sub":
-            self.stacked_widget.setCurrentWidget(self.subwindow)
-            self.subwindow.csv_name_edit.setText("{}".format(self.datahub.file_Name))
 
     def start(self):
         self.show()
@@ -1846,8 +1168,5 @@ class window(QMainWindow):
     def closeEvent(self, event):
         self.datahub.communication_stop()
         self.datahub.datasaver_stop()
-        try:
-            self.mainwindow.enuviewer.stop()
-        except Exception:
-            pass
+
         event.accept()
