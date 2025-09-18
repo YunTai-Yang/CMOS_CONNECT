@@ -9,11 +9,8 @@ class Datahub:
         self.isdatasaver_start = 0
         self.file_Name = 'Your File Name.csv'
         self.mySerialPort = 'COM8'
-        self.mySendSerialPort = 'COM1'
         self.myBaudrate = 115200
-        self.mySendBaudrate = 115200
         self.serial_port_error = -1
-        self.sender_error = -1              # Sender용: -1(대기), 0(정상), 1(오류)
 
         # 스레드 락 (수신/시각화 경합 방지)
         self.lock = threading.RLock()

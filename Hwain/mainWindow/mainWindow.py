@@ -367,57 +367,57 @@ class RocketViewer_Thread(QThread):
         # UI 레이블 초기화
         self.speed_label = QLabel("Speed ", self.mainwindow.container)
         self.speed_label.setGeometry(*ws.speed_label_geometry)
-        self.speed_label.setStyleSheet("color: #00FF00;")
+        self.speed_label.setStyleSheet("color: #FFFFFF;")
         self.speed_label.setFont(ws.font_speed_text)
 
         self.altitude_label = QLabel("Altitude ", self.mainwindow.container)
         self.altitude_label.setGeometry(*ws.altitude_label_geometry)
-        self.altitude_label.setStyleSheet("color: #00FF00;")
+        self.altitude_label.setStyleSheet("color: #FFFFFF;")
         self.altitude_label.setFont(ws.font_altitude_text)
 
-        self.roll_label = QLabel("Roll : ", self.mainwindow.container)
+        self.roll_label = QLabel("Roll: ", self.mainwindow.container)
         self.roll_label.setGeometry(*ws.roll_label_geometry)
-        self.roll_label.setStyleSheet("color: #00FF00;")
+        self.roll_label.setStyleSheet("color: #FFFFFF;")
         self.roll_label.setFont(ws.font_roll_text)
 
-        self.pitch_label = QLabel("Pitch : ", self.mainwindow.container)
+        self.pitch_label = QLabel("Pitch: ", self.mainwindow.container)
         self.pitch_label.setGeometry(*ws.pitch_label_geometry)
-        self.pitch_label.setStyleSheet("color: #00FF00;")
+        self.pitch_label.setStyleSheet("color: #FFFFFF;")
         self.pitch_label.setFont(ws.font_pitch_text)
 
-        self.yaw_label = QLabel("Yaw : ", self.mainwindow.container)
+        self.yaw_label = QLabel("Yaw: ", self.mainwindow.container)
         self.yaw_label.setGeometry(*ws.yaw_label_geometry)
-        self.yaw_label.setStyleSheet("color: #00FF00;")
+        self.yaw_label.setStyleSheet("color: #FFFFFF;")
         self.yaw_label.setFont(ws.font_yaw_text)
 
-        self.rollspeed_label = QLabel("Roll_speed : ", self.mainwindow.container)
+        self.rollspeed_label = QLabel("Roll_speed: ", self.mainwindow.container)
         self.rollspeed_label.setGeometry(*ws.rollspeed_label_geometry)
-        self.rollspeed_label.setStyleSheet("color: #00FF00;")
+        self.rollspeed_label.setStyleSheet("color: #FFFFFF;")
         self.rollspeed_label.setFont(ws.font_rollspeed_text)
 
-        self.pitchspeed_label = QLabel("Pitch_speed : ", self.mainwindow.container)
+        self.pitchspeed_label = QLabel("Pitch_speed: ", self.mainwindow.container)
         self.pitchspeed_label.setGeometry(*ws.pitchspeed_label_geometry)
-        self.pitchspeed_label.setStyleSheet("color: #00FF00;")
+        self.pitchspeed_label.setStyleSheet("color: #FFFFFF;")
         self.pitchspeed_label.setFont(ws.font_pitchspeed_text)
 
-        self.yawspeed_label = QLabel("Yaw_speed : ", self.mainwindow.container)
+        self.yawspeed_label = QLabel("Yaw_speed: ", self.mainwindow.container)
         self.yawspeed_label.setGeometry(*ws.yawspeed_label_geometry)
-        self.yawspeed_label.setStyleSheet("color: #00FF00;")
+        self.yawspeed_label.setStyleSheet("color: #FFFFFF;")
         self.yawspeed_label.setFont(ws.font_yawspeed_text)
 
-        self.xacc_label = QLabel("X_acc : ", self.mainwindow.container)
+        self.xacc_label = QLabel("X_acc: ", self.mainwindow.container)
         self.xacc_label.setGeometry(*ws.xacc_label_geometry)
-        self.xacc_label.setStyleSheet("color: #00FF00;")
+        self.xacc_label.setStyleSheet("color: #FFFFFF;")
         self.xacc_label.setFont(ws.font_xacc_text)
 
-        self.yacc_label = QLabel("Y_acc : ", self.mainwindow.container)
+        self.yacc_label = QLabel("Y_acc: ", self.mainwindow.container)
         self.yacc_label.setGeometry(*ws.yacc_label_geometry)
-        self.yacc_label.setStyleSheet("color: #00FF00;")
+        self.yacc_label.setStyleSheet("color: #FFFFFF;")
         self.yacc_label.setFont(ws.font_yacc_text)
 
-        self.zacc_label = QLabel("Z_acc : ", self.mainwindow.container)
+        self.zacc_label = QLabel("Z_acc: ", self.mainwindow.container)
         self.zacc_label.setGeometry(*ws.zacc_label_geometry)
-        self.zacc_label.setStyleSheet("color: #00FF00;")
+        self.zacc_label.setStyleSheet("color: #FFFFFF;")
         self.zacc_label.setFont(ws.font_zacc_text)
 
         # 메인 스레드에서 타이머 설정
@@ -614,7 +614,7 @@ class MainWindow(PageWindow):
         self.guide_text.setGeometry(*ws.cmd_geometry)
         self.now_status.setGeometry(*ws.status_geometry)
         self.now_status.setFont(ws.font_status_text)
-        self.now_status.setStyleSheet("color:#00FF00;")
+        self.now_status.setStyleSheet("color:#FFFFFF;")
         
         base_dir = Path(__file__).resolve().parent
 
@@ -626,6 +626,15 @@ class MainWindow(PageWindow):
             .scaled(*ws.team_logo_geometry[2:4], Qt.KeepAspectRatio)
         )
         self.team_logo.setGeometry(*ws.team_logo_geometry)
+
+        # rudasys logo (부모를 self.container 로 변경)
+        logo_path = base_dir / 'rudasys.png'
+        self.rudasys_logo = QLabel(self.container)
+        self.rudasys_logo.setPixmap(
+            QPixmap(str(logo_path))
+            .scaled(*ws.rudasys_logo_geometry[2:4], Qt.KeepAspectRatio)
+        )
+        self.rudasys_logo.setGeometry(*ws.rudasys_logo_geometry)
 
         # irri logo
         irri_path = base_dir / 'irri.png'

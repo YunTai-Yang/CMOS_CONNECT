@@ -18,13 +18,7 @@ btn_h    = b * 0.050    # 버튼 세로
 btn_hgap = a * 0.010    # 가로 간격
 btn_vgap = b * 0.015    # 세로 간격
 
-# row-major (윗줄→아랫줄, 각 줄 3개)
-buttons_geometry = np.array([
-    [btn_x0 + c*(btn_w+btn_hgap),  btn_y0 + r*(btn_h+btn_vgap),  btn_w, btn_h]
-    for r in range(3) for c in range(3)
-]).astype(int)
-
-mainwindow_color = "background-color: rgb(25,25,25);"
+mainwindow_color = "background-color: rgb(0,0,0);"
 webEngine_geometry = np.array([a*0.001,  b*0.001,  b*0.0001, b*0.0001]).astype(int)
 
 # graph geometry
@@ -52,7 +46,7 @@ ay_checker_geomoetry = np.array([a*0.01,  b*0.805,  100,  30]).astype(int)
 az_checker_geomoetry = np.array([a*0.01,  b*0.845,  100,  30]).astype(int)
 
 # gps map
-map_geometry = np.array([a*0.79,  b*0.37,  a*0.20,  a*0.16]).astype(int)
+map_geometry = np.array([a*0.77,  b*0.37,  a*0.18,  a*0.16]).astype(int)
 
 # serial port editer geometry
 port_text_geometry = np.array([a*0.9,  b*0.89, a*0.04, a*0.01125]).astype(int)
@@ -69,26 +63,27 @@ reset_geometry  = np.array([a*0.82,  b*0.907, 0.07*a, 0.025*a]).astype(int)
 status_geometry = np.array([a*0.9,  b*0.84, 0.10*a, 0.025*a]).astype(int)
 
 # rocket animation
-model_geometry = np.array([a*0.79,  b*0.14,  a*0.2, a*0.125]).astype(int)
+model_geometry = np.array([a*0.77,  b*0.14,  a*0.2, a*0.125]).astype(int)
 speed_label_geometry = np.array([a*0.76, b*0.67, 550, 41]).astype(int)
 altitude_label_geometry = np.array([a*0.88, b*0.67, 550, 41]).astype(int)
-roll_label_geometry = np.array([a*0.74, b*0.717, 340, 40]).astype(int)
-pitch_label_geometry = np.array([a*0.74, b*0.767, 340, 40]).astype(int)
-yaw_label_geometry = np.array([a*0.74, b*0.82, 340, 40]).astype(int)
-rollspeed_label_geometry = np.array([a*0.82, b*0.72, 510, 45]).astype(int)
-pitchspeed_label_geometry = np.array([a*0.82, b*0.77, 510, 45]).astype(int)
-yawspeed_label_geometry = np.array([a*0.82, b*0.82, 510, 45]).astype(int)
-xacc_label_geometry = np.array([a*0.925, b*0.72, 335, 40]).astype(int)
-yacc_label_geometry = np.array([a*0.925, b*0.77, 335, 40]).astype(int)
-zacc_label_geometry = np.array([a*0.925, b*0.82, 335, 40]).astype(int)
+roll_label_geometry = np.array([a*0.74, b*0.7105, 340, 45]).astype(int)
+pitch_label_geometry = np.array([a*0.74, b*0.762, 340, 45]).astype(int)
+yaw_label_geometry = np.array([a*0.74, b*0.82, 340, 45]).astype(int)
+rollspeed_label_geometry = np.array([a*0.815, b*0.7105, 510, 45]).astype(int)
+pitchspeed_label_geometry = np.array([a*0.815, b*0.762, 510, 45]).astype(int)
+yawspeed_label_geometry = np.array([a*0.815, b*0.818, 510, 45]).astype(int)
+xacc_label_geometry = np.array([a*0.925, b*0.7105, 335, 40]).astype(int)
+yacc_label_geometry = np.array([a*0.925, b*0.762, 335, 40]).astype(int)
+zacc_label_geometry = np.array([a*0.925, b*0.818, 335, 40]).astype(int)
 
 # 
 cmd_geometry = np.array([a*0.001, 0.001*a,  a*0.0001,  0.0001*a]).astype(int)
 
 # 상단 로고들
-team_logo_geometry = np.array([a*0.29, 0.022*b,  2200,  200]).astype(int)
+team_logo_geometry = np.array([a*0.29, 0.02*b,  2200,  200]).astype(int)
+rudasys_logo_geometry = np.array([a*0.085, 0.02*b,  520,  170]).astype(int)
 irri_logo_geometry = np.array([a*0.797, -0.075*b,  650,  500]).astype(int)
-patch22_logo_geometry = np.array([a*0.04, 0.0182*b,  a*0.2, b*0.1]).astype(int)
+patch22_logo_geometry = np.array([a*0.0005, 0.023*b,  a*0.08, b*0.1]).astype(int)
 
 # all fonts
 font_portText = QFont()
@@ -134,52 +129,53 @@ font_button_text = QFont()
 font_button_text.setPointSize(7)
 
 font_status_text = QFont()
-font_status_text.setFamily("VCR OSD Mono")
+font_status_text.setFamily("NanumGothicCoding")
 font_status_text.setPointSize(12)
+font_status_text.setBold(True)
 # next to rocket animation
 font_speed_text = QFont()
-font_speed_text.setFamily("VCR OSD Mono")
-font_speed_text.setPointSize(20)
+font_speed_text.setFamily("NanumGothicCoding")
+font_speed_text.setPointSize(16)
 
 font_altitude_text = QFont()
-font_altitude_text.setFamily("VCR OSD Mono")
-font_altitude_text.setPointSize(20)
+font_altitude_text.setFamily("NanumGothicCoding")
+font_altitude_text.setPointSize(16)
 
 font_roll_text = QFont()
-font_roll_text.setFamily("VCR OSD Mono")
-font_roll_text.setPointSize(12)
+font_roll_text.setFamily("NanumGothicCoding")
+font_roll_text.setPointSize(11)
 
 font_pitch_text = QFont()
-font_pitch_text.setFamily("VCR OSD Mono")
-font_pitch_text.setPointSize(12)
+font_pitch_text.setFamily("NanumGothicCoding")
+font_pitch_text.setPointSize(11)
 
 font_yaw_text = QFont()
-font_yaw_text.setFamily("VCR OSD Mono")
-font_yaw_text.setPointSize(12)
+font_yaw_text.setFamily("NanumGothicCoding")
+font_yaw_text.setPointSize(11)
 
 font_rollspeed_text = QFont()
-font_rollspeed_text.setFamily("VCR OSD Mono")
-font_rollspeed_text.setPointSize(12)
+font_rollspeed_text.setFamily("NanumGothicCoding")
+font_rollspeed_text.setPointSize(11)
 
 font_pitchspeed_text = QFont()
-font_pitchspeed_text.setFamily("VCR OSD Mono")
-font_pitchspeed_text.setPointSize(12)
+font_pitchspeed_text.setFamily("NanumGothicCoding")
+font_pitchspeed_text.setPointSize(11)
 
 font_yawspeed_text = QFont()
-font_yawspeed_text.setFamily("VCR OSD Mono")
-font_yawspeed_text.setPointSize(12)
+font_yawspeed_text.setFamily("NanumGothicCoding")
+font_yawspeed_text.setPointSize(11)
 
 font_xacc_text = QFont()
-font_xacc_text.setFamily("VCR OSD Mono")
-font_xacc_text.setPointSize(12)
+font_xacc_text.setFamily("NanumGothicCoding")
+font_xacc_text.setPointSize(11)
 
 font_yacc_text = QFont()
-font_yacc_text.setFamily("VCR OSD Mono")
-font_yacc_text.setPointSize(12)
+font_yacc_text.setFamily("NanumGothicCoding")
+font_yacc_text.setPointSize(11)
 
 font_zacc_text = QFont()
-font_zacc_text.setFamily("VCR OSD Mono")
-font_zacc_text.setPointSize(12)
+font_zacc_text.setFamily("NanumGothicCoding")
+font_zacc_text.setPointSize(11)
 
 
 start_status = 'Program start.'
