@@ -271,6 +271,12 @@ class Datahub:
         q0, q1, q2, q3 = map(float, datas[13:17])
         w_p, w_y, w_r  = map(float, datas[17:20])
 
+        has_angles = len(datas) >= 23
+        if has_angles:
+            roll_in  = float(datas[20])
+            pitch_in = float(datas[21])
+            yaw_in   = float(datas[22])
+
         # 누적 시간(sec) — 라이브는 10 ms 단위 가정
         tsec = float(h)*3600.0 + float(m)*60.0 + float(s) + float(tm)/100.0
 
@@ -301,17 +307,17 @@ class Datahub:
             self.q2 = np.append(self.q2, np.float32(q2))
             self.q3 = np.append(self.q3, np.float32(q3))
 
-            self.rollSpeeds  = np.append(self.rollSpeeds,  np.float32(w_p))
-            self.pitchSpeeds = np.append(self.pitchSpeeds, np.float32(w_y))
-            self.yawSpeeds   = np.append(self.yawSpeeds,   np.float32(w_r))
+            self.rollSpeeds  = np.append(self.rollSpeeds,  np.float32(w_r))
+            self.pitchSpeeds = np.append(self.pitchSpeeds, np.float32(w_p))
+            self.yawSpeeds   = np.append(self.yawSpeeds,   np.float32(w_y))
 
             # ENU 기준 확보
             self._ensure_ref_from_first_ecef(E, N, U)
             lat0, lon0, _ = self._ref_lla
 
             # Euler (body→ENU, Z–X–Y)
-            if self.use_ref_for_euler:
-                r, p, y_ = Datahub.euler_from_quat_body_to_enu_zxy(q0, q1, q2, q3, lat0, lon0)
+            if has_angles:
+                r, p, y_ = roll_in, pitch_in, yaw_in
             else:
                 lat_deg, lon_deg, _ = self._ecef_to_lla(E, N, U)
                 r, p, y_ = Datahub.euler_from_quat_body_to_enu_zxy(q0, q1, q2, q3, lat_deg, lon_deg)
@@ -367,6 +373,12 @@ class Datahub:
                           A[:,15].astype(np.float32), A[:,16].astype(np.float32))
         w_p, w_y, w_r = A[:,17].astype(np.float32), A[:,18].astype(np.float32), A[:,19].astype(np.float32)
 
+        has_angles = A.shape[1] >= 23
+        if has_angles:
+            roll_in  = A[:,20].astype(np.float32)
+            pitch_in = A[:,21].astype(np.float32)
+            yaw_in   = A[:,22].astype(np.float32)
+
         # 파생값
         self._ensure_ref_from_first_ecef(float(x[0]), float(y[0]), float(z[0]))
         lat0, lon0, _ = self._ref_lla
@@ -375,20 +387,10 @@ class Datahub:
         e_list, n_list, u_list = [], [], []
         vE_list, vN_list, vU_list = [], [], []
 
-        for i in range(A.shape[0]):
-            r, p, y_ = Datahub.euler_from_quat_body_to_enu_zxy(
-                float(q0[i]), float(q1[i]), float(q2[i]), float(q3[i]),
-                float(lat0), float(lon0)
-            )
-            rolls.append(np.float32(r)); pitchs.append(np.float32(p)); yaws.append(np.float32(y_))
-
-            e, n, u = self._ecef_to_enu(np.array([x[i], y[i], z[i]], dtype=float),
-                                        self._ref_ecef, float(lat0), float(lon0))
-            e_list.append(np.float32(e)); n_list.append(np.float32(n)); u_list.append(np.float32(u))
-
-            vE_e, vN_e, vU_e = self._ecef_vec_to_enu(np.array([vx[i], vy[i], vz[i]], dtype=float),
-                                                     float(lat0), float(lon0))
-            vE_list.append(np.float32(vE_e)); vN_list.append(np.float32(vN_e)); vU_list.append(np.float32(vU_e))
+        if has_angles:
+            r, p, y_ = roll_in, pitch_in, yaw_in
+        else:
+            r, p, y_ = Datahub.euler_from_quat_body_to_enu_zxy(q0, q1, q2, q3, lat0, lon0)
 
         rolls  = np.asarray(rolls,  dtype=np.float32)
         pitchs = np.asarray(pitchs, dtype=np.float32)
@@ -427,9 +429,9 @@ class Datahub:
             self.Xaccels     = a_p if self.Xaccels.size     == 0 else np.concatenate((self.Xaccels,     a_p))
             self.Yaccels     = a_y if self.Yaccels.size     == 0 else np.concatenate((self.Yaccels,     a_y))
             self.Zaccels     = a_r if self.Zaccels.size     == 0 else np.concatenate((self.Zaccels,     a_r))
-            self.rollSpeeds  = w_p if self.rollSpeeds.size  == 0 else np.concatenate((self.rollSpeeds,  w_p))
-            self.pitchSpeeds = w_y if self.pitchSpeeds.size == 0 else np.concatenate((self.pitchSpeeds, w_y))
-            self.yawSpeeds   = w_r if self.yawSpeeds.size   == 0 else np.concatenate((self.yawSpeeds,   w_r))
+            self.rollSpeeds  = w_p if self.rollSpeeds.size  == 0 else np.concatenate((self.rollSpeeds,  w_r))
+            self.pitchSpeeds = w_y if self.pitchSpeeds.size == 0 else np.concatenate((self.pitchSpeeds, w_p))
+            self.yawSpeeds   = w_r if self.yawSpeeds.size   == 0 else np.concatenate((self.yawSpeeds,   w_y))
 
             # 쿼터니언
             self.q0 = q0 if self.q0.size == 0 else np.concatenate((self.q0, q0))
