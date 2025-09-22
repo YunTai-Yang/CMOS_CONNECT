@@ -423,7 +423,7 @@ class RocketViewer_Thread(QThread):
         # 메인 스레드에서 타이머 설정
         self.timer = QTimer(self.mainwindow)
         self.timer.timeout.connect(self.update_pose)
-        self.timer.start(10)  # 10ms마다 호출
+        self.timer.start(33)  # 33ms마다 호출
 
     def add_axes(self):
         # X축 (빨간색)
@@ -441,7 +441,7 @@ class RocketViewer_Thread(QThread):
     def load_and_display_obj(self, filename):
         vertices, faces = self.load_obj(filename)
         centroid = np.mean(vertices, axis=0)
-        mesh = gl.GLMeshItem(vertexes=vertices, faces=faces, drawEdges=True,
+        mesh = gl.GLMeshItem(vertexes=vertices, faces=faces, drawEdges=False,
                                 edgeColor=(1, 1, 1, 1), smooth=False)
         mesh.translate(-centroid[0], -centroid[1], -centroid[2])
 
@@ -891,7 +891,7 @@ class MainWindow(PageWindow):
                 return
 
             self.now_status.setText(ws.start_status)
-            self.now_status.setStyleSheet("color:#00FF00;")
+            self.now_status.setStyleSheet("color:#FFFFFF;")
             self.start_button.setEnabled(False)
             self.stop_button.setEnabled(True)
             self.rf_port_edit.setEnabled(False)
@@ -943,7 +943,7 @@ class MainWindow(PageWindow):
             self.datahub.communication_stop()
             self.datahub.datasaver_stop()
             self.now_status.setText(ws.wait_status)
-            self.now_status.setStyleSheet("color:#00FF00;")
+            self.now_status.setStyleSheet("color:#FFFFFF;")
             self.start_button.setEnabled(True)
             self.stop_button.setEnabled(False)
             self.reset_button.setEnabled(False)

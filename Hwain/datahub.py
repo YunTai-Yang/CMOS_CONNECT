@@ -187,16 +187,6 @@ class Datahub:
                 return 1
             time.sleep(poll_ms / 1000.0)
 
-    def check_sender_error(self, timeout=2.0, poll_ms=50):
-        deadline = time.perf_counter() + timeout
-        while True:
-            s = self.sender_error
-            if s in (0, 1):
-                return s
-            if time.perf_counter() >= deadline:
-                return 1
-            time.sleep(poll_ms / 1000.0)
-
     # ---------- 오일러 변환 유틸 ----------
     @staticmethod
     def _normalize_quat(w, x, y, z):
