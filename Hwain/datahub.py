@@ -23,9 +23,9 @@ class Datahub:
         self.t        = np.empty(0, dtype=np.float64)  # 누적초(시간은 정밀도 위해 float64)
 
         # ---------- ECEF 입력 (이름은 East/North/Up이지만 ECEF임: X/Y/Z) ----------
-        self.Easts  = np.empty(0, dtype=np.float32)  # X
-        self.Norths = np.empty(0, dtype=np.float32)  # Y
-        self.Ups    = np.empty(0, dtype=np.float32)  # Z
+        self.real_pitch  = np.empty(0, dtype=np.float32)  # X
+        self.real_yaw = np.empty(0, dtype=np.float32)  # Y
+        self.real_roll    = np.empty(0, dtype=np.float32)  # Z
 
         # ---------- ECEF 속도 입력 ----------
         self.vE = np.empty(0, dtype=np.float32)  # Xdot
@@ -249,25 +249,22 @@ class Datahub:
     def update(self, datas):
         """
         datas: 길이 20
-        [h,m,s,tm, E,N,U, vE,vN,vU, a_p,a_y,a_r, q0,q1,q2,q3, w_p,w_y,w_r]
+        [h,m,s,tm, pitch, yaw, roll, vE,vN,vU, a_x,a_y,a_z, q0,q1,q2,q3, w_p,w_y,w_r]
+        - 앞의 3칸은 '각도(deg)'로 재해석
+        - ENU/오일러 파생값 계산 없음
         """
         if datas is None or len(datas) < 20:
             return
 
         h = int(datas[0]); m = int(datas[1]); s = int(datas[2]); tm = int(datas[3])
-        E, N, U       = map(float, datas[4:7])
-        vE, vN, vU    = map(float, datas[7:10])
-        a_p, a_y, a_r = map(float, datas[10:13])
-        q0, q1, q2, q3 = map(float, datas[13:17])
-        w_p, w_y, w_r  = map(float, datas[17:20])
 
-        has_angles = len(datas) >= 23
-        if has_angles:
-            roll_in  = float(datas[20])
-            pitch_in = float(datas[21])
-            yaw_in   = float(datas[22])
+        pitch, yaw, roll = map(float, datas[4:7])   # 각도(deg)
+        vE, vN, vU       = map(float, datas[7:10])  # 사용 안 해도 저장은 유지
+        a_x, a_y, a_z    = map(float, datas[10:13])
+        q0, q1, q2, q3   = map(float, datas[13:17])
+        w_p, w_y, w_r    = map(float, datas[17:20])  # X, Y, Z
 
-        # 누적 시간(sec) — 라이브는 10 ms 단위 가정
+        # 누적 시간(sec)
         tsec = float(h)*3600.0 + float(m)*60.0 + float(s) + float(tm)/100.0
 
         with self.lock:
@@ -278,59 +275,34 @@ class Datahub:
             self.tenmilis = np.append(self.tenmilis, np.uint8(tm))
             self.t        = np.append(self.t,        np.float64(tsec))
 
-            # ECEF pos/vel
-            self.Easts  = np.append(self.Easts,  np.float32(E))
-            self.Norths = np.append(self.Norths, np.float32(N))
-            self.Ups    = np.append(self.Ups,    np.float32(U))
+            # 각도 저장 (이전 E/N/U 자리에 매핑)
+            self.real_pitch = np.append(self.real_pitch, np.float32(pitch))
+            self.real_yaw   = np.append(self.real_yaw,   np.float32(yaw))
+            self.real_roll  = np.append(self.real_roll,  np.float32(roll))
 
+            # 원래 패킷 구조 유지: 속도/가속/쿼터니언/각속도 저장
             self.vE = np.append(self.vE, np.float32(vE))
             self.vN = np.append(self.vN, np.float32(vN))
             self.vU = np.append(self.vU, np.float32(vU))
 
-            # accel / gyro
-            self.Xaccels = np.append(self.Xaccels, np.float32(a_p))
+            self.Xaccels = np.append(self.Xaccels, np.float32(a_x))
             self.Yaccels = np.append(self.Yaccels, np.float32(a_y))
-            self.Zaccels = np.append(self.Zaccels, np.float32(a_r))
+            self.Zaccels = np.append(self.Zaccels, np.float32(a_z))
 
             self.q0 = np.append(self.q0, np.float32(q0))
             self.q1 = np.append(self.q1, np.float32(q1))
             self.q2 = np.append(self.q2, np.float32(q2))
             self.q3 = np.append(self.q3, np.float32(q3))
 
-            self.rollSpeeds  = np.append(self.rollSpeeds,  np.float32(w_r))
+            # 각속도: X=Pitch, Y=Yaw, Z=Roll
             self.pitchSpeeds = np.append(self.pitchSpeeds, np.float32(w_p))
             self.yawSpeeds   = np.append(self.yawSpeeds,   np.float32(w_y))
+            self.rollSpeeds  = np.append(self.rollSpeeds,  np.float32(w_r))
 
-            # ENU 기준 확보
-            self._ensure_ref_from_first_ecef(E, N, U)
-            lat0, lon0, _ = self._ref_lla
-
-            # Euler (body→ENU, Z–X–Y)
-            if has_angles:
-                r, p, y_ = roll_in, pitch_in, yaw_in
-            else:
-                lat_deg, lon_deg, _ = self._ecef_to_lla(E, N, U)
-                r, p, y_ = Datahub.euler_from_quat_body_to_enu_zxy(q0, q1, q2, q3, lat_deg, lon_deg)
-
-            self.rolls  = np.append(self.rolls,  np.float32(r))
-            self.pitchs = np.append(self.pitchs, np.float32(p))
-            self.yaws   = np.append(self.yaws,   np.float32(y_))
-
-            # ENU pos/vel
-            e, n, u = self._ecef_to_enu(np.array([E, N, U], float), self._ref_ecef, lat0, lon0)
-            self.e_enu = np.append(self.e_enu, np.float32(e))
-            self.n_enu = np.append(self.n_enu, np.float32(n))
-            self.u_enu = np.append(self.u_enu, np.float32(u))
-
-            vE_e, vN_e, vU_e = self._ecef_vec_to_enu(np.array([vE, vN, vU], float), lat0, lon0)
-            self.vE_enu = np.append(self.vE_enu, np.float32(vE_e))
-            self.vN_enu = np.append(self.vN_enu, np.float32(vN_e))
-            self.vU_enu = np.append(self.vU_enu, np.float32(vU_e))
-
-            spd = float(np.sqrt(vE_e*vE_e + vN_e*vN_e + vU_e*vU_e))
-            self.speed  = np.append(self.speed,  np.float32(spd))
-            self.yspeed = np.append(self.yspeed, np.float32(vN_e))
-            self.zspeed = np.append(self.zspeed, np.float32(vU_e))
+            # ▼ 파생값(ENU/Euler/속도스칼라) 전부 미사용 → 계산/append 제거
+            # self.rolls / self.pitchs / self.yaws 도 사용 안 함 (append 생략)
+            # self.e_enu / self.n_enu / self.u_enu / self.vE_enu / ... 도 생략
+            # self.speed / self.yspeed / self.zspeed 도 생략
 
     def update_from_row(self, row):
         """단일 샘플 업데이트 (라이브/CSV 공통). 내부적으로 batch_update 사용."""

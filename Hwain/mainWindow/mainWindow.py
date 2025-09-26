@@ -470,17 +470,14 @@ class RocketViewer_Thread(QThread):
             return f"{val:.2f}{suffix}" if np.isfinite(val) else "N/A"
 
         # 1) 오리엔테이션: Datahub가 이미 ENU 기준 Z–X–Y 오일러 제공
-        roll_z  = _last(self.datahub.rolls)   # deg
-        pitch_x = _last(self.datahub.pitchs)  # deg
-        yaw_y   = _last(self.datahub.yaws)    # deg
-
-        YAW_OFFSET = 90.0
-        yaw_y_adj = yaw_y + YAW_OFFSET
+        roll_z  = _last(self.datahub.real_roll)   # deg
+        pitch_x = _last(self.datahub.real_pitch)  # deg
+        yaw_y   = _last(self.datahub.real_yaw)    # deg
 
         self.rocket_mesh.resetTransform()
         self.rocket_mesh.rotate(roll_z,  0, 0, 1)  # Z roll
         self.rocket_mesh.rotate(pitch_x, 1, 0, 0)  # X pitch
-        self.rocket_mesh.rotate(yaw_y_adj,   0, 1, 0)  # Y yaw
+        self.rocket_mesh.rotate(yaw_y,   0, 1, 0)  # Y yaw
 
         # 2) 속도: Datahub.speed (ENU 기반) 바로 사용
         spd = _last(self.datahub.speed)
@@ -493,12 +490,12 @@ class RocketViewer_Thread(QThread):
         # 4) 각도 레이블
         self.roll_label.setText(f"Roll : {_fmt(roll_z,'°')}")
         self.pitch_label.setText(f"Pitch : {_fmt(pitch_x,'°')}")
-        self.yaw_label.setText(f"Yaw : {_fmt(yaw_y_adj,'°')}")
+        self.yaw_label.setText(f"Yaw : {_fmt(yaw_y,'°')}")
 
         # 5) 각속도/가속도 (rad/s, m/s²)
-        self.rollspeed_label.setText(f"Roll_speed : {_fmt(_last(self.datahub.rollSpeeds),'Rad/s')}")
-        self.pitchspeed_label.setText(f"Pitch_speed : {_fmt(_last(self.datahub.pitchSpeeds),'Rad/s')}")
-        self.yawspeed_label.setText(f"Yaw_speed : {_fmt(_last(self.datahub.yawSpeeds),'Rad/s')}")
+        self.rollspeed_label.setText(f"Roll_speed : {_fmt(_last(self.datahub.rollSpeeds),'deg/s')}")
+        self.pitchspeed_label.setText(f"Pitch_speed : {_fmt(_last(self.datahub.pitchSpeeds),'deg/s')}")
+        self.yawspeed_label.setText(f"Yaw_speed : {_fmt(_last(self.datahub.yawSpeeds),'deg/s')}")
 
         self.xacc_label.setText(f"X_acc : {_fmt(_last(self.datahub.Xaccels),'m/s²')}")
         self.yacc_label.setText(f"Y_acc : {_fmt(_last(self.datahub.Yaccels),'m/s²')}")
@@ -1156,7 +1153,7 @@ class window(QMainWindow):
 
     def initUI(self):
         self.resize(*ws.full_size)
-        self.setWindowTitle('I-link')
+        self.setWindowTitle('CMOS-CONNECT')
         self.setStyleSheet(ws.mainwindow_color) 
 
         path = abspath(__file__)

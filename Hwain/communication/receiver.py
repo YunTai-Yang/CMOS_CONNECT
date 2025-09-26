@@ -15,7 +15,7 @@ HEADER_SIZE = 3                                # 'A','B', len
 PACKET_SIZE = HEADER_SIZE + BODY_SIZE + 1      # CHANGED: + 'Z' = 137
 
 #패킷 'A', 'B', len, h, m, s, tenms,
-#     est_x, est_y, est_z,
+#     pitch, yaw, roll,
 #     est_vx, est_vy, est_vz,
 #     a_x, a_y, a_z,
 #     q0, q1, q2, q3,
