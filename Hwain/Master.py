@@ -6,7 +6,6 @@ from communication.sender   import Sender
 from mainWindow.mainWindow  import window
 from datahub import Datahub
 
-
 class Thread_Receiver(Thread):
     """Receiver(Thread)를 백그라운드에서 돌리는 래퍼 (기존 구조 유지)."""
     def __init__(self, datahub):

@@ -957,7 +957,6 @@ class MainWindow(PageWindow):
             msg_box.setStyleSheet("QMessageBox {background-color: white;}")
             msg_box.information(self,"information","Cancel")
 
-
     #curve hide check box is clicked
     # def xspeed_hide_checkbox_state(self,state):
     #     self.graphviewer.curve_xspeed.setVisible(state != Qt.Checked)
