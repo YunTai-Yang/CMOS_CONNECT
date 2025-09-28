@@ -80,10 +80,10 @@ zacc_label_geometry = np.array([a*0.925, b*0.818, 335, 40]).astype(int)
 cmd_geometry = np.array([a*0.001, 0.001*a,  a*0.0001,  0.0001*a]).astype(int)
 
 # 상단 로고들
-team_logo_geometry = np.array([a*0.29, 0.02*b,  2200,  200]).astype(int)
-rudasys_logo_geometry = np.array([a*0.085, 0.02*b,  520,  170]).astype(int)
+team_logo_geometry = np.array([a*0.215, 0.02*b,  2200,  200]).astype(int)
+rudasys_logo_geometry = np.array([a*0.77, 0.02*b,  520,  170]).astype(int)
 irri_logo_geometry = np.array([a*0.797, -0.075*b,  650,  500]).astype(int)
-patch22_logo_geometry = np.array([a*0.0005, 0.023*b,  a*0.08, b*0.1]).astype(int)
+patch22_logo_geometry = np.array([a*0.01, 0.025*b,  a*0.22, b*0.13]).astype(int)
 
 # all fonts
 font_portText = QFont()

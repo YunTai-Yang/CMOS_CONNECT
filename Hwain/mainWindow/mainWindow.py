@@ -637,14 +637,14 @@ class MainWindow(PageWindow):
         )
         self.rudasys_logo.setGeometry(*ws.rudasys_logo_geometry)
 
-        # irri logo
-        irri_path = base_dir / 'irri.png'
-        self.irri_logo = QLabel(self.container)
-        self.irri_logo.setPixmap(
-            QPixmap(str(irri_path))
-            .scaled(*ws.irri_logo_geometry[2:4], Qt.KeepAspectRatio)
-        )
-        self.irri_logo.setGeometry(*ws.irri_logo_geometry)
+        # # irri logo
+        # irri_path = base_dir / 'irri.png'
+        # self.irri_logo = QLabel(self.container)
+        # self.irri_logo.setPixmap(
+        #     QPixmap(str(irri_path))
+        #     .scaled(*ws.irri_logo_geometry[2:4], Qt.KeepAspectRatio)
+        # )
+        # self.irri_logo.setGeometry(*ws.irri_logo_geometry)
 
         # patch22 logo
         patch22_path = base_dir / '22patch.png'
